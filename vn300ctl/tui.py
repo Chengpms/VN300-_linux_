@@ -317,13 +317,12 @@ class VN300App(App):
     #live-grid { grid-size: 3; grid-columns: 38 1fr 1fr; grid-rows: auto; grid-gutter: 1 1; height: auto; margin: 0 0 1 0; }
     #chart-grid { grid-size: 2; grid-columns: 1fr 1fr; grid-rows: auto; grid-gutter: 1 1; height: auto; }
     .chart { height: 15; }
-    #view3d-panel { column-span: 2; height: 22; }
+    #view3d-panel { height: 22; margin: 0 0 1 0; }
     #view3d-live { height: 1fr; }
     #view3d-full { height: 1fr; }
     .narrow-select { width: 10; }
     .-narrow #live-grid { grid-size: 1; grid-columns: 1fr; }
     .-narrow #chart-grid { grid-size: 1; grid-columns: 1fr; }
-    .-narrow #view3d-panel { column-span: 1; }
     .-narrow #conn-grid { grid-size: 1; }
     .-narrow .wide-select { width: 28; }
     .-narrow #reg-split { layout: vertical; }
@@ -532,10 +531,11 @@ class VN300App(App):
                     yield Static("", id="ins-text")
                     yield Label(_("GPS A / B"), classes="panel-title")
                     yield Static("", id="gnss-text")
+            # fuera de #chart-grid: dentro de una fila "auto" el 1fr de Attitude3D estira la fila
+            with Vertical(classes="panel", id="view3d-panel"):
+                yield Label(_("Vista 3D"), classes="panel-title")
+                yield Attitude3D(self._ypr_now, lock=self.live.lock, show_help=False, id="view3d-live")
             with Grid(id="chart-grid"):
-                with Vertical(classes="panel", id="view3d-panel"):
-                    yield Label(_("Vista 3D"), classes="panel-title")
-                    yield Attitude3D(self._ypr_now, lock=self.live.lock, show_help=False, id="view3d-live")
                 with Vertical(classes="panel"):
                     yield BrailleChart("Pitch/Roll", ["Pitch", "Roll"], ["#5fd75f", "#5fafff"], "deg",
                                        source=lambda: self.live.series.get("ypr"), lock=self.live.lock,
