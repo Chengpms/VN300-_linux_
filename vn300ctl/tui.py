@@ -13,6 +13,8 @@ Todo segun el manual UM005 para firmware v0.5.0.0 (rev. 2.22).
 
 from __future__ import annotations
 
+from .i18n import LANG, LANGS, _, save_lang
+
 import json
 import math
 import os
@@ -29,17 +31,39 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import (Button, DataTable, Footer, Input, Label,
-                             ProgressBar, RichLog, Select, SelectionList,
-                             Static, Switch, TabbedContent, TabPane)
+from textual.widgets import Button as _Button
+from textual.widgets import (DataTable, Footer, Label, ProgressBar, RichLog,
+                             SelectionList, Static, Switch, TabbedContent, TabPane)
+from textual.widgets import Input as _Input
+from textual.widgets import Select as _Select
 
 from . import registers as R
 from .charts import BrailleChart
+from .view3d import Attitude3D
 from .device import AUTOBAUD_ORDER, VN300, VNError, VNTimeout, list_ports
 from .livestate import LiveState
 from .protocol import BIN_NAMES, GROUP_TITLES
 
 DEG = 180.0 / math.pi
+
+
+# Botones, selectores y campos en version compacta (una linea): interfaz mas limpia.
+class Button(_Button):
+    def __init__(self, *args, **kw):
+        kw.setdefault("compact", True)
+        super().__init__(*args, **kw)
+
+
+class Select(_Select):
+    def __init__(self, *args, **kw):
+        kw.setdefault("compact", True)
+        super().__init__(*args, **kw)
+
+
+class Input(_Input):
+    def __init__(self, *args, **kw):
+        kw.setdefault("compact", True)
+        super().__init__(*args, **kw)
 CONFIG_DIR = os.path.expanduser("~/vn300_configs")
 
 
@@ -122,7 +146,7 @@ def bar(value: float, rng: float, width: int = 21) -> Text:
     return t
 
 
-def flag(ok: bool, yes: str = "SI", no: str = "NO", bad_is_red=True) -> Text:
+def flag(ok: bool, yes: str = _("SI"), no: str = "NO", bad_is_red=True) -> Text:
     return Text(f" {yes if ok else no} ", style=("bold black on green" if ok else
                                                   ("bold white on red" if bad_is_red else "black on yellow")))
 
@@ -132,7 +156,7 @@ def flag(ok: bool, yes: str = "SI", no: str = "NO", bad_is_red=True) -> Text:
 # --------------------------------------------------------------------------- #
 
 class Confirm(ModalScreen[bool]):
-    def __init__(self, title: str, body: str, ok: str = "Confirmar", danger: bool = False):
+    def __init__(self, title: str, body: str, ok: str = _("Confirmar"), danger: bool = False):
         super().__init__()
         self.t, self.b, self.ok, self.danger = title, body, ok, danger
 
@@ -141,7 +165,7 @@ class Confirm(ModalScreen[bool]):
             yield Label(self.t, classes="dlg-title")
             yield Static(self.b, classes="dlg-body")
             with Horizontal(classes="dlg-buttons"):
-                yield Button("Cancelar", id="no")
+                yield Button(_("Cancelar"), id="no")
                 yield Button(self.ok, id="yes", variant="error" if self.danger else "primary")
 
     @on(Button.Pressed)
@@ -162,8 +186,8 @@ class AskPath(ModalScreen[Optional[str]]):
             yield Label(self.t, classes="dlg-title")
             yield Input(self.default, id="path")
             with Horizontal(classes="dlg-buttons"):
-                yield Button("Cancelar", id="no")
-                yield Button("Aceptar", id="yes", variant="primary")
+                yield Button(_("Cancelar"), id="no")
+                yield Button(_("Aceptar"), id="yes", variant="primary")
 
     @on(Input.Submitted)
     def _sub(self, ev: Input.Submitted) -> None:
@@ -211,24 +235,24 @@ class BinaryWizard(ModalScreen[Optional[List[str]]]):
                     continue
                 key = f"{g}:{b}"
                 items.append((f"G{g} {GROUP_TITLES[g]:<8} {name}", key, key in selected))
-        rate_opts = [(f"{400 // d if 400 % d == 0 else round(400 / d, 2)} Hz  (divisor {d})", str(d))
+        rate_opts = [(_("{0} Hz  (divisor {1})").format(400 // d if 400 % d == 0 else round(400 / d, 2), d), str(d))
                      for d in sorted({400 // r for r in self.RATES}, reverse=True)]
         with Vertical(classes="dialog wide"):
-            yield Label(f"Asistente de salida binaria — registro {self.rid}", classes="dlg-title")
+            yield Label(_("Asistente de salida binaria — registro {0}").format(self.rid), classes="dlg-title")
             with Horizontal(classes="row"):
-                yield Label("Puerto:", classes="lbl")
-                yield Select([("Desactivado", "0"), ("Puerto 1", "1"), ("Puerto 2", "2"), ("Ambos", "3")],
+                yield Label(_("Puerto:"), classes="lbl")
+                yield Select([(_("Desactivado"), "0"), (_("Puerto 1"), "1"), (_("Puerto 2"), "2"), (_("Ambos"), "3")],
                              value=str(mode) if mode in (0, 1, 2, 3) else "1", allow_blank=False, id="bw-mode")
-                yield Label("Frecuencia:", classes="lbl")
+                yield Label(_("Frecuencia:"), classes="lbl")
                 vals = [v for _, v in rate_opts]
                 yield Select(rate_opts, value=str(div) if str(div) in vals else "8",
                              allow_blank=False, id="bw-div")
-            yield Static("Marca los campos a incluir (espacio para marcar):", classes="hint")
+            yield Static(_("Marca los campos a incluir (espacio para marcar):"), classes="hint")
             yield SelectionList(*items, id="bw-fields")
             yield Static("", id="bw-preview", classes="hint")
             with Horizontal(classes="dlg-buttons"):
-                yield Button("Cancelar", id="no")
-                yield Button("Usar estos valores", id="yes", variant="primary")
+                yield Button(_("Cancelar"), id="no")
+                yield Button(_("Usar estos valores"), id="yes", variant="primary")
 
     def on_mount(self) -> None:
         self._preview()
@@ -272,65 +296,80 @@ class VN300App(App):
     SUB_TITLE = "VectorNav VN-300 — firmware v0.5.0.0"
 
     CSS = """
-    Screen { background: $surface; }
-    #status { height: 1; background: $primary-background; color: $text; padding: 0 1; }
-    .panel { border: round $primary; padding: 0 1; height: auto; }
-    .panel-title { color: $accent; text-style: bold; }
+    Screen { background: $background; }
+    #status { height: 1; background: $panel; color: $text; padding: 0 1; }
+    TabbedContent > ContentTabs { margin: 0 0 1 0; }
+    .panel {
+        border: round $primary 35%; border-title-color: $accent; border-title-style: bold;
+        border-title-align: left; padding: 0 1; height: auto; margin: 0 0 1 0;
+    }
+    .panel:focus-within { border: round $primary 70%; }
+    Grid > .panel { margin: 0; }
+    .panel-title { color: $accent; text-style: bold; margin: 1 0 0 0; }
     .row { height: auto; margin: 0 0 1 0; }
-    .lbl { width: auto; padding: 1 1 0 0; }
-    .hint { color: $text-muted; }
-    Button { margin: 0 1 0 0; min-width: 10; }
+    .lbl { width: auto; padding: 0 1 0 0; color: $text-muted; }
+    .hint { color: $text-muted; text-style: italic; }
+    Button { margin: 0 1 0 0; min-width: 6; padding: 0 1; }
     Select { width: 30; }
+    Input { width: 30; }
     .wide-select { width: 50; }
-    #conn-grid { grid-size: 2; grid-columns: 1fr 1fr; grid-gutter: 1; height: auto; }
-    #live-grid { grid-size: 3; grid-columns: 38 1fr 1fr; grid-rows: auto; grid-gutter: 0 1; height: auto; }
-    #chart-grid { grid-size: 2; grid-columns: 1fr 1fr; grid-rows: auto; grid-gutter: 0 1; height: auto; }
-    .chart { height: 17; }
-    .narrow-select { width: 14; }
+    #conn-grid { grid-size: 2; grid-columns: 1fr 1fr; grid-gutter: 1 1; height: auto; }
+    #live-grid { grid-size: 3; grid-columns: 38 1fr 1fr; grid-rows: auto; grid-gutter: 1 1; height: auto; margin: 0 0 1 0; }
+    #chart-grid { grid-size: 2; grid-columns: 1fr 1fr; grid-rows: auto; grid-gutter: 1 1; height: auto; }
+    .chart { height: 15; }
+    #view3d-panel { column-span: 2; height: 22; }
+    #view3d-live { height: 1fr; }
+    #view3d-full { height: 1fr; }
+    .narrow-select { width: 10; }
     .-narrow #live-grid { grid-size: 1; grid-columns: 1fr; }
     .-narrow #chart-grid { grid-size: 1; grid-columns: 1fr; }
+    .-narrow #view3d-panel { column-span: 1; }
     .-narrow #conn-grid { grid-size: 1; }
     .-narrow .wide-select { width: 28; }
     .-narrow #reg-split { layout: vertical; }
     .-narrow #reg-left { width: 1fr; height: 60%; }
     .-narrow #reg-right { width: 1fr; height: 40%; }
-    #reg-left { width: 120; }
-    .filter-row { height: 3; }
-    #reg-filter { width: 1fr; }
+    #reg-left { width: 1fr; }
+    #reg-right { width: 68; }
+    .filter-row { height: auto; margin: 0 0 1 0; }
+    #reg-filter { width: 1fr; margin: 0 1 0 0; }
     #reg-scope { width: 34; }
     #reg-table { height: 1fr; }
-    #reg-filter { margin: 0 0 0 0; }
     #reg-right { padding: 0 1; }
-    #reg-form { height: auto; }
-    .field-row { height: auto; }
-    .field-name { width: 26; padding: 1 1 0 0; }
-    .field-input { width: 30; }
-    .field-hint { padding: 1 0 0 1; color: $text-muted; width: 1fr; }
-    #batch-table { height: 8; }
-    #console-log { height: 1fr; border: round $primary; }
-    #console-input { dock: bottom; }
-    .dialog { width: 70; height: auto; max-height: 90%; border: thick $accent; background: $panel; padding: 1 2; }
+    #reg-title { margin: 0 0 1 0; }
+    #reg-form { height: auto; margin: 1 0; }
+    .field-row { height: auto; margin: 0 0 0 0; }
+    .field-name { width: 20; padding: 0 1 0 0; }
+    .field-input { width: 24; }
+    .field-hint { padding: 0 0 0 1; color: $text-muted; width: 1fr; }
+    #batch-table { height: 8; margin: 0 0 1 0; }
+    #console-log { height: 1fr; border: round $primary 35%; }
+    #console-input { dock: bottom; width: 1fr; margin: 1 0 0 0; }
+    .dialog { width: 70; height: auto; max-height: 90%; border: round $accent; background: $panel; padding: 1 2; }
     .dialog.wide { width: 100; }
-    ModalScreen { align: center middle; }
+    ModalScreen { align: center middle; background: $background 60%; }
     .dlg-title { text-style: bold; color: $accent; margin: 0 0 1 0; }
     .dlg-buttons { height: auto; margin: 1 0 0 0; align-horizontal: right; }
     #bw-fields { height: 20; }
     .danger { color: $error; }
     #hsi-progress { width: 40; }
+    #hsi-out, #bias-out, #mnt-out, #bin-out { height: auto; }
+    .panel > .row:last-of-type { margin: 0; }
     """
 
     HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (150, "-wide")]
 
     BINDINGS = [
-        Binding("f1", "tab('tab-conn')", "Conexion", priority=True),
-        Binding("f2", "tab('tab-live')", "En vivo", priority=True),
-        Binding("f3", "tab('tab-regs')", "Registros", priority=True),
-        Binding("f4", "tab('tab-console')", "Consola", priority=True),
-        Binding("f5", "tab('tab-tools')", "Herramientas", priority=True),
-        Binding("ctrl+s", "save_flash", "Guardar flash", priority=True),
-        Binding("ctrl+r", "record", "Grabar CSV"),
-        Binding("ctrl+f", "freeze", "Congelar graficas"),
-        Binding("ctrl+q", "quit", "Salir", priority=True),
+        Binding("f1", "tab('tab-conn')", _("Conexion"), priority=True, show=False),
+        Binding("f2", "tab('tab-live')", _("En vivo"), priority=True, show=False),
+        Binding("f3", "tab('tab-regs')", _("Registros"), priority=True, show=False),
+        Binding("f4", "tab('tab-console')", _("Consola"), priority=True, show=False),
+        Binding("f5", "tab('tab-tools')", _("Herramientas"), priority=True, show=False),
+        Binding("f6", "tab('tab-3d')", _("Vista 3D"), priority=True, show=False),
+        Binding("ctrl+s", "save_flash", _("Guardar flash"), priority=True),
+        Binding("ctrl+r", "record", _("Grabar CSV")),
+        Binding("ctrl+f", "freeze", _("Congelar graficas")),
+        Binding("ctrl+q", "quit", _("Salir"), priority=True),
     ]
 
     def __init__(self, port: Optional[str] = None, baud: Optional[int] = None):
@@ -364,68 +403,74 @@ class VN300App(App):
     def compose(self) -> ComposeResult:
         yield Static("", id="status")
         with TabbedContent(initial="tab-conn"):
-            with TabPane("F1 Conexion", id="tab-conn"):
+            with TabPane(_("F1 Conexion"), id="tab-conn"):
                 yield from self._compose_conn()
-            with TabPane("F2 En vivo", id="tab-live"):
+            with TabPane(_("F2 En vivo"), id="tab-live"):
                 yield from self._compose_live()
-            with TabPane("F3 Registros", id="tab-regs"):
+            with TabPane(_("F3 Registros"), id="tab-regs"):
                 yield from self._compose_regs()
-            with TabPane("F4 Consola", id="tab-console"):
+            with TabPane(_("F4 Consola"), id="tab-console"):
                 yield from self._compose_console()
-            with TabPane("F5 Herramientas", id="tab-tools"):
+            with TabPane(_("F5 Herramientas"), id="tab-tools"):
                 yield from self._compose_tools()
+            with TabPane(_("F6 Vista 3D"), id="tab-3d"):
+                yield Attitude3D(self._ypr_now, lock=self.live.lock, id="view3d-full")
         yield Footer()
 
     def _port_options(self):
         opts = [(p, p.split("  ")[0]) for p in list_ports()]
-        opts.append(("sim  (VN-300 simulado, sin hardware)", "sim"))
+        opts.append((_("sim  (VN-300 simulado, sin hardware)"), "sim"))
         return opts
 
     def _compose_conn(self) -> ComposeResult:
         with VerticalScroll():
             with Vertical(classes="panel"):
-                yield Label("1. Conectar", classes="panel-title")
+                yield Label(_("1. Conectar"), classes="panel-title")
                 with Horizontal(classes="row"):
-                    yield Label("Puerto:", classes="lbl")
-                    yield Select(self._port_options(), id="sel-port", prompt="Elige puerto",
+                    yield Label(_("Puerto:"), classes="lbl")
+                    yield Select(self._port_options(), id="sel-port", prompt=_("Elige puerto"),
                                  classes="wide-select")
-                    yield Button("↻", id="btn-refresh", tooltip="Volver a buscar puertos")
+                    yield Button("↻", id="btn-refresh", tooltip=_("Volver a buscar puertos"))
                     yield Label("Baudrate:", classes="lbl")
-                    yield Select([("Auto-detectar", "auto")] + [(str(b), str(b)) for b in sorted(AUTOBAUD_ORDER)],
+                    yield Select([(_("Auto-detectar"), "auto")] + [(str(b), str(b)) for b in sorted(AUTOBAUD_ORDER)],
                                  value="auto", allow_blank=False, id="sel-baud")
                 with Horizontal(classes="row"):
-                    yield Button("Conectar", id="btn-connect", variant="success")
-                    yield Button("Desconectar", id="btn-disconnect", variant="warning")
-                yield Static("Si no aparece /dev/ttyUSB0: revisa el cable y que tu usuario este en el grupo "
-                             "'dialout' (sudo usermod -aG dialout $USER y vuelve a iniciar sesion).", classes="hint")
+                    yield Button(_("Conectar"), id="btn-connect", variant="success")
+                    yield Button(_("Desconectar"), id="btn-disconnect", variant="warning")
+                yield Static(_("Si no aparece /dev/ttyUSB0: revisa el cable y que tu usuario este en el grupo 'dialout' (sudo usermod -aG dialout $USER y vuelve a iniciar sesion)."), classes="hint")
             with Grid(id="conn-grid"):
                 with Vertical(classes="panel"):
-                    yield Label("2. Equipo", classes="panel-title")
-                    yield Static("Sin conexion", id="dev-info")
+                    yield Label(_("2. Equipo"), classes="panel-title")
+                    yield Static(_("Sin conexion"), id="dev-info")
                 with Vertical(classes="panel"):
-                    yield Label("3. Salida asincrona ASCII (registros 6 y 7)", classes="panel-title")
+                    yield Label(_("3. Salida asincrona ASCII (registros 6 y 7)"), classes="panel-title")
                     with Horizontal(classes="row"):
-                        yield Label("Mensaje:", classes="lbl")
+                        yield Label(_("Mensaje:"), classes="lbl")
                         yield Select([(f"{k:>2} {v}", str(k)) for k, v in R.ADOR.items()], id="sel-ador",
                                      prompt="ADOR")
                     with Horizontal(classes="row"):
-                        yield Label("Frecuencia:", classes="lbl")
+                        yield Label(_("Frecuencia:"), classes="lbl")
                         yield Select([(f"{f} Hz", str(f)) for f in R.ADOF], id="sel-adof", prompt="ADOF")
                     with Horizontal(classes="row"):
-                        yield Button("Aplicar", id="btn-async-apply", variant="primary")
-                        yield Button("Pausar", id="btn-async-pause")
-                        yield Button("Reanudar", id="btn-async-resume")
+                        yield Button(_("Aplicar"), id="btn-async-apply", variant="primary")
+                        yield Button(_("Pausar"), id="btn-async-pause")
+                        yield Button(_("Reanudar"), id="btn-async-resume")
                 with Vertical(classes="panel"):
-                    yield Label("4. Acciones del equipo", classes="panel-title")
+                    yield Label(_("4. Acciones del equipo"), classes="panel-title")
                     with Horizontal(classes="row"):
-                        yield Button("Guardar en flash", id="btn-wnv", variant="primary",
-                                     tooltip="$VNWNV: guarda todos los registros en memoria no volatil (Ctrl+S)")
-                        yield Button("Reset", id="btn-reset", tooltip="$VNRST: reinicia el equipo")
-                        yield Button("Restaurar fabrica", id="btn-rfs", variant="error")
-                    yield Static("Los cambios en registros quedan en RAM hasta pulsar 'Guardar en flash'. "
-                                 "El equipo debe estar quieto al guardar.", classes="hint")
+                        yield Button(_("Guardar en flash"), id="btn-wnv", variant="primary",
+                                     tooltip=_("$VNWNV: guarda todos los registros en memoria no volatil (Ctrl+S)"))
+                        yield Button("Reset", id="btn-reset", tooltip=_("$VNRST: reinicia el equipo"))
+                        yield Button(_("Restaurar fabrica"), id="btn-rfs", variant="error")
+                    yield Static(_("Los cambios en registros quedan en RAM hasta pulsar 'Guardar en flash'. El equipo debe estar quieto al guardar."), classes="hint")
                 with Vertical(classes="panel"):
-                    yield Label("5. Trafico", classes="panel-title")
+                    yield Label(_("Idioma / Language"), classes="panel-title")
+                    with Horizontal(classes="row"):
+                        yield Label(_("Idioma:"), classes="lbl")
+                        yield Select([(name, code) for code, name in LANGS.items()], value=LANG,
+                                     allow_blank=False, id="sel-lang")
+                with Vertical(classes="panel"):
+                    yield Label(_("5. Trafico"), classes="panel-title")
                     yield Static("", id="traffic")
 
     def _chart(self, key: str, title: str, labels, unit: str, **kw) -> BrailleChart:
@@ -440,37 +485,57 @@ class VN300App(App):
             return ned
         return self.live.series.get("vel_body") or ned
 
+    def _ypr_now(self):
+        """Ultima actitud (yaw, pitch, roll en grados) o None si no hay datos recientes."""
+        if self.live.age("ypr") > 3.0:
+            return None
+        return self.live.v.get("ypr")
+
+    @on(Select.Changed, "#sel-lang")
+    def _lang(self, ev: Select.Changed) -> None:
+        lang = str(ev.value)
+        if lang == LANG:
+            return
+        save_lang(lang)
+        self.notify(_("Idioma cambiado: reiniciando la interfaz…"))
+        port = self.dev.port if self.dev.connected else None
+        baud = self.dev.baud if self.dev.connected else None
+        self.set_timer(0.3, lambda: self.exit({"lang": lang, "port": port, "baud": baud}))
+
     def _compose_live(self) -> ComposeResult:
         with VerticalScroll():
             with Horizontal(classes="row"):
-                yield Label("Fuente:", classes="lbl")
-                yield Select([("Auto (asincrono + sondeo de lo que falte)", "auto"),
-                              ("Solo asincrono / binario", "async"),
-                              ("Solo sondeo de registros", "poll")],
+                yield Label(_("Fuente:"), classes="lbl")
+                yield Select([(_("Auto (asincrono + sondeo de lo que falte)"), "auto"),
+                              (_("Solo asincrono / binario"), "async"),
+                              (_("Solo sondeo de registros"), "poll")],
                              value="auto", allow_blank=False, id="sel-poll", classes="wide-select")
-                yield Label("Ventana:", classes="lbl")
+                yield Label(_("Ventana:"), classes="lbl")
                 yield Select([(f"{w} s", str(w)) for w in (2, 5, 10, 30, 60)], value="10",
                              allow_blank=False, id="sel-window", classes="narrow-select")
-                yield Button("⏸ Congelar", id="btn-freeze", tooltip="Congela las graficas (Ctrl+F)")
-                yield Button("● Grabar CSV", id="btn-rec", variant="error")
+                yield Button(_("⏸ Congelar"), id="btn-freeze", tooltip=_("Congela las graficas (Ctrl+F)"))
+                yield Button(_("● Grabar CSV"), id="btn-rec", variant="error")
                 yield Static("", id="rec-info", classes="lbl")
             with Grid(id="live-grid"):
                 with Vertical(classes="panel", id="att-panel"):
-                    yield Label("Actitud", classes="panel-title")
+                    yield Label(_("Actitud"), classes="panel-title")
                     yield Static("", id="att-text")
                     yield Static("", id="horizon")
                     yield Static("", id="compass")
                 with Vertical(classes="panel"):
-                    yield Label("IMU (compensada)", classes="panel-title")
+                    yield Label(_("IMU (compensada)"), classes="panel-title")
                     yield Static("", id="imu-text")
-                    yield Label("Compas GPS", classes="panel-title")
+                    yield Label(_("Compas GPS"), classes="panel-title")
                     yield Static("", id="compass-text")
                 with Vertical(classes="panel"):
                     yield Label("INS", classes="panel-title")
                     yield Static("", id="ins-text")
-                    yield Label("GPS A / B", classes="panel-title")
+                    yield Label(_("GPS A / B"), classes="panel-title")
                     yield Static("", id="gnss-text")
             with Grid(id="chart-grid"):
+                with Vertical(classes="panel", id="view3d-panel"):
+                    yield Label(_("Vista 3D"), classes="panel-title")
+                    yield Attitude3D(self._ypr_now, lock=self.live.lock, show_help=False, id="view3d-live")
                 with Vertical(classes="panel"):
                     yield BrailleChart("Pitch/Roll", ["Pitch", "Roll"], ["#5fd75f", "#5fafff"], "deg",
                                        source=lambda: self.live.series.get("ypr"), lock=self.live.lock,
@@ -482,7 +547,7 @@ class VN300App(App):
                 with Vertical(classes="panel"):
                     yield self._chart("mag", "Mag", ["X", "Y", "Z"], "Gauss", min_span=0.01)
                 with Vertical(classes="panel"):
-                    yield BrailleChart("Velocidad", ["N|X", "E|Y", "D|Z"], ["#ff5f5f", "#5fd75f", "#5fafff"], "m/s",
+                    yield BrailleChart(_("Velocidad"), ["N|X", "E|Y", "D|Z"], ["#ff5f5f", "#5fd75f", "#5fafff"], "m/s",
                                        source=self._vel_series, lock=self.live.lock,
                                        id="ch-vel", classes="chart", min_span=0.1)
                 with Vertical(classes="panel"):
@@ -495,110 +560,114 @@ class VN300App(App):
         with Horizontal(id="reg-split"):
             with Vertical(id="reg-left"):
                 with Horizontal(classes="filter-row"):
-                    yield Input(placeholder="Filtrar por nombre, ID, grupo o estado…", id="reg-filter")
-                    yield Select([("Documentados + detectados", "known"), ("Solo los que responden", "resp"),
-                                  ("Solo activos", "active"), ("Todos (0-255)", "all")],
+                    yield Input(placeholder=_("Filtrar por nombre, ID, grupo o estado…"), id="reg-filter")
+                    yield Select([(_("Documentados + detectados"), "known"), (_("Solo los que responden"), "resp"),
+                                  (_("Solo activos"), "active"), (_("Todos (0-255)"), "all")],
                                  value="known", allow_blank=False, id="reg-scope")
                 yield Static("", id="scan-info", classes="hint")
                 yield DataTable(id="reg-table", cursor_type="row", zebra_stripes=True)
                 with Horizontal(classes="row"):
-                    yield Button("Escanear equipo", id="btn-read-all", variant="primary",
-                                 tooltip="Lee los 256 IDs ($VNRRG) y marca cuales existen y cuales estan activos")
-                    yield Button("Exportar config", id="btn-export")
-                    yield Button("Importar config", id="btn-import")
+                    yield Button(_("Escanear equipo"), id="btn-read-all", variant="primary",
+                                 tooltip=_("Lee los 256 IDs ($VNRRG) y marca cuales existen y cuales estan activos"))
+                    yield Button(_("Exportar config"), id="btn-export")
+                    yield Button(_("Importar config"), id="btn-import")
             with VerticalScroll(id="reg-right"):
-                yield Static("Selecciona un registro de la lista.", id="reg-title")
+                yield Static(_("Selecciona un registro de la lista."), id="reg-title")
                 yield Static("", id="reg-desc", classes="hint")
                 yield Vertical(id="reg-form")
                 with Horizontal(classes="row"):
-                    yield Button("Leer", id="btn-read", variant="primary", tooltip="$VNRRG")
-                    yield Button("Escribir", id="btn-write", variant="warning", tooltip="$VNWRG (queda en RAM)")
-                    yield Button("Escribir + flash", id="btn-write-flash", variant="error",
-                                 tooltip="$VNWRG y luego $VNWNV")
-                    yield Button("+ Lote", id="btn-batch-add", tooltip="Agregar al lote para flashear varios juntos")
-                    yield Button("Asistente binario", id="btn-bin-wizard")
-                yield Label("Lote de escritura (varios registros a la vez)", classes="panel-title")
+                    yield Button(_("Leer"), id="btn-read", variant="primary", tooltip="$VNRRG")
+                    yield Button(_("Escribir"), id="btn-write", variant="warning", tooltip=_("$VNWRG (queda en RAM)"))
+                    yield Button(_("Escribir + flash"), id="btn-write-flash", variant="error",
+                                 tooltip=_("$VNWRG y luego $VNWNV"))
+                    yield Button(_("+ Lote"), id="btn-batch-add", tooltip=_("Agregar al lote para flashear varios juntos"))
+                    yield Button(_("Asistente binario"), id="btn-bin-wizard")
+                yield Label(_("Lote de escritura (varios registros a la vez)"), classes="panel-title")
                 yield DataTable(id="batch-table", cursor_type="row")
                 with Horizontal(classes="row"):
-                    yield Button("Flashear lote", id="btn-batch-flash", variant="error",
-                                 tooltip="Escribe todos los registros del lote y guarda en flash")
-                    yield Button("Quitar seleccionado", id="btn-batch-del")
-                    yield Button("Vaciar", id="btn-batch-clear")
-                    yield Button("Guardar lote…", id="btn-batch-save")
+                    yield Button(_("Flashear lote"), id="btn-batch-flash", variant="error",
+                                 tooltip=_("Escribe todos los registros del lote y guarda en flash"))
+                    yield Button(_("Quitar seleccionado"), id="btn-batch-del")
+                    yield Button(_("Vaciar"), id="btn-batch-clear")
+                    yield Button(_("Guardar lote…"), id="btn-batch-save")
                 yield ProgressBar(id="batch-progress", show_eta=False)
 
     def _compose_console(self) -> ComposeResult:
         with Vertical():
             with Horizontal(classes="row"):
-                yield Label("Mostrar trafico de fondo (asincrono + sondeo):", classes="lbl")
+                yield Label(_("Mostrar trafico de fondo (asincrono + sondeo):"), classes="lbl")
                 yield Switch(False, id="sw-async-console")
-                yield Button("Limpiar", id="btn-console-clear")
-                yield Static("Escribe p.ej.  RRG,8   WRG,7,40   WNV   ASY,0  — '$VN' y el checksum se agregan solos.",
+                yield Button(_("Limpiar"), id="btn-console-clear")
+                yield Static(_("Escribe p.ej.  RRG,8   WRG,7,40   WNV   ASY,0  — '$VN' y el checksum se agregan solos."),
                              classes="hint lbl")
             yield RichLog(id="console-log", max_lines=3000, markup=False, wrap=False)
-            yield Input(placeholder="Comando…  (Enter para enviar)", id="console-input")
+            yield Input(placeholder=_("Comando…  (Enter para enviar)"), id="console-input")
 
     def _compose_tools(self) -> ComposeResult:
         with VerticalScroll():
             with Vertical(classes="panel"):
-                yield Label("Calibracion hard/soft iron (registros 44 / 47 / 23)", classes="panel-title")
-                yield Static("1) Iniciar  2) Gira el equipo despacio en todas las orientaciones  "
-                             "3) Detener  4) Guardar en flash.", classes="hint")
+                yield Label(_("Calibracion hard/soft iron (registros 44 / 47 / 23)"), classes="panel-title")
+                yield Static(_("1) Iniciar  2) Gira el equipo despacio en todas las orientaciones  3) Detener  4) Guardar en flash."), classes="hint")
                 with Horizontal(classes="row"):
-                    yield Label("Velocidad:", classes="lbl")
-                    hsi_lbl = {1: "1  lento (60-90 s), preciso", 3: "3  medio", 5: "5  rapido (15-20 s)"}
+                    yield Label(_("Velocidad:"), classes="lbl")
+                    hsi_lbl = {1: _("1  lento (60-90 s), preciso"), 3: _("3  medio"), 5: _("5  rapido (15-20 s)")}
                     yield Select([(hsi_lbl.get(i, str(i)), str(i)) for i in range(1, 6)],
                                  value="3", allow_blank=False, id="sel-hsi-rate", classes="wide-select")
-                    yield Button("Iniciar", id="btn-hsi-start", variant="success")
-                    yield Button("Detener", id="btn-hsi-stop", variant="warning")
-                    yield Button("Reiniciar solucion", id="btn-hsi-reset")
-                    yield Button("Leer solucion", id="btn-hsi-read")
-                    yield Button("Copiar a reg 23", id="btn-hsi-copy")
+                    yield Button(_("Iniciar"), id="btn-hsi-start", variant="success")
+                    yield Button(_("Detener"), id="btn-hsi-stop", variant="warning")
+                    yield Button(_("Reiniciar solucion"), id="btn-hsi-reset")
+                    yield Button(_("Leer solucion"), id="btn-hsi-read")
+                    yield Button(_("Copiar a reg 23"), id="btn-hsi-copy")
                 yield Static("", id="hsi-out")
             with Vertical(classes="panel"):
-                yield Label("Bias de arranque (registro 74, comandos $VNSGB / $VNSFB)", classes="panel-title")
-                yield Static("Con el equipo quieto y el filtro convergido, copia los bias estimados al registro 74 "
-                             "para que el filtro arranque con ellos. Se guarda en flash ($VNWNV).", classes="hint")
+                yield Label(_("Bias de arranque (registro 74, comandos $VNSGB / $VNSFB)"), classes="panel-title")
+                yield Static(_("Con el equipo quieto y el filtro convergido, copia los bias estimados al registro 74 para que el filtro arranque con ellos. Se guarda en flash ($VNWNV)."), classes="hint")
                 with Horizontal(classes="row"):
-                    yield Button("Guardar bias giroscopo (SGB)", id="btn-sgb")
-                    yield Button("Guardar bias filtro INS (SFB)", id="btn-sfb")
-                    yield Button("Leer reg 74", id="btn-read74")
+                    yield Button(_("Guardar bias giroscopo (SGB)"), id="btn-sgb")
+                    yield Button(_("Guardar bias filtro INS (SFB)"), id="btn-sfb")
+                    yield Button(_("Leer reg 74"), id="btn-read74")
                 yield Static("", id="bias-out")
             with Vertical(classes="panel"):
-                yield Label("Montaje del sensor (registro 26, Reference Frame Rotation)", classes="panel-title")
-                yield Static("Angulos (deg) del sensor respecto al vehiculo, secuencia 3-2-1. "
-                             "Requiere guardar en flash y reset para aplicarse.", classes="hint")
+                yield Label(_("Montaje del sensor (registro 26, Reference Frame Rotation)"), classes="panel-title")
+                yield Static(_("Angulos (deg) del sensor respecto al vehiculo, secuencia 3-2-1. Requiere guardar en flash y reset para aplicarse."), classes="hint")
                 with Horizontal(classes="row"):
                     for k in ("Yaw", "Pitch", "Roll"):
                         yield Label(f"{k}:", classes="lbl")
                         yield Input("0", id=f"mnt-{k.lower()}", classes="field-input", type="number")
                 with Horizontal(classes="row"):
-                    yield Button("Calcular matriz", id="btn-mnt-calc")
-                    yield Button("Escribir + flash + reset", id="btn-mnt-write", variant="error")
+                    yield Button(_("Calcular matriz"), id="btn-mnt-calc")
+                    yield Button(_("Escribir + flash + reset"), id="btn-mnt-write", variant="error")
                 yield Static("", id="mnt-out")
             with Vertical(classes="panel"):
-                yield Label("Salida binaria (registros 75-77)", classes="panel-title")
+                yield Label(_("Salida binaria (registros 75-77)"), classes="panel-title")
                 with Horizontal(classes="row"):
                     for n, rid in ((1, 75), (2, 76), (3, 77)):
-                        yield Button(f"Configurar salida {n} (reg {rid})", id=f"btn-binwiz-{rid}")
+                        yield Button(_("Configurar salida {0} (reg {1})").format(n, rid), id=f"btn-binwiz-{rid}")
                 yield Static("", id="bin-out")
 
     # ------------------------------------------------------------------ #
     #  Arranque
     # ------------------------------------------------------------------ #
     def on_mount(self) -> None:
+        self.theme = "tokyo-night"
+        # el primer titulo de cada panel pasa al borde (mas limpio que una linea extra)
+        for panel in self.query(".panel"):
+            first = panel.children[0] if panel.children else None
+            if isinstance(first, Label) and first.has_class("panel-title"):
+                panel.border_title = str(first.content)
+                first.remove()
         t = self.query_one("#reg-table", DataTable)
         t.add_column("ID", key="id", width=4)
-        t.add_column("Nombre", key="name", width=30)
-        t.add_column("Grupo", key="group", width=11)
+        t.add_column(_("Nombre"), key="name", width=30)
+        t.add_column(_("Grupo"), key="group", width=11)
         t.add_column("Acc", key="acc", width=3)
-        t.add_column("Estado", key="state", width=11)
-        t.add_column("Detalle", key="detail", width=44)
+        t.add_column(_("Estado"), key="state", width=11)
+        t.add_column(_("Detalle"), key="detail", width=44)
         self._fill_reg_table("")
         b = self.query_one("#batch-table", DataTable)
         b.add_column("ID", key="id", width=4)
-        b.add_column("Registro", key="name", width=28)
-        b.add_column("Valores", key="vals")
+        b.add_column(_("Registro"), key="name", width=28)
+        b.add_column(_("Valores"), key="vals")
         self.query_one("#batch-progress", ProgressBar).display = False
         self.set_interval(0.066, self._refresh_live)
         self.set_interval(0.2, self._drain_console)
@@ -630,7 +699,7 @@ class VN300App(App):
     @on(Button.Pressed, "#btn-refresh")
     def _refresh_ports(self) -> None:
         self.query_one("#sel-port", Select).set_options(self._port_options())
-        self.notify("Lista de puertos actualizada")
+        self.notify(_("Lista de puertos actualizada"))
 
     @on(Button.Pressed, "#btn-connect")
     def _connect_btn(self) -> None:
@@ -641,10 +710,10 @@ class VN300App(App):
         port = self.query_one("#sel-port", Select).value
         baud = self.query_one("#sel-baud", Select).value
         if port is Select.NULL or not port:
-            self.call_from_thread(self.notify, "Elige un puerto primero", severity="warning")
+            self.call_from_thread(self.notify, _("Elige un puerto primero"), severity="warning")
             return
         self._stop_polling()
-        self.call_from_thread(self.notify, f"Conectando a {port}…")
+        self.call_from_thread(self.notify, _("Conectando a {0}…").format(port))
         try:
             if baud == "auto":
                 b = self.dev.autodetect(port)
@@ -654,7 +723,7 @@ class VN300App(App):
                 b = int(baud)
         except Exception as exc:
             self.dev.close()
-            self.call_from_thread(self.notify, f"No se pudo conectar: {exc}", severity="error", timeout=8)
+            self.call_from_thread(self.notify, _("No se pudo conectar: {0}").format(exc), severity="error", timeout=8)
             return
         self.info = self.dev.device_info()
         for rid in (6, 7):
@@ -671,10 +740,8 @@ class VN300App(App):
         self._fill_reg_table()
         fw = self.info.get("fw", "")
         if fw and not self.dev.firmware_matches(fw):
-            self.notify(f"El equipo tiene firmware v{fw}; la app usa la configuracion de v{R.FIRMWARE} "
-                        f"({R.MANUAL}). Los registros que no esten en ese manual se muestran como "
-                        "'sin documentar'.", severity="warning", timeout=15)
-        self.notify(f"Conectado a {self.dev.port} @ {baud} baud", severity="information")
+            self.notify(_("El equipo tiene firmware v{0}; la app usa la configuracion de v{1} ({2}). Los registros que no esten en ese manual se muestran como 'sin documentar'.").format(fw, R.FIRMWARE, R.MANUAL), severity="warning", timeout=15)
+        self.notify(_("Conectado a {0} @ {1} baud").format(self.dev.port, baud), severity="information")
         self._render_info()
         for rid, sel in ((6, "#sel-ador"), (7, "#sel-adof")):
             v = self.reg_cache.get(rid)
@@ -686,18 +753,18 @@ class VN300App(App):
 
     def _render_info(self) -> None:
         if not self.dev.connected:
-            self.query_one("#dev-info", Static).update("Sin conexion")
+            self.query_one("#dev-info", Static).update(_("Sin conexion"))
             return
         t = Table.grid(padding=(0, 2))
         t.add_column(style="bold")
         t.add_column()
-        for k, lab in (("model", "Modelo"), ("serial", "N/S"), ("fw", "Firmware"), ("hw", "Hardware"),
+        for k, lab in (("model", _("Modelo")), ("serial", "N/S"), ("fw", "Firmware"), ("hw", "Hardware"),
                        ("tag", "User tag")):
             t.add_row(lab, self.info.get(k, "?"))
         fw = self.info.get("fw", "")
-        t.add_row("Catalogo", Text(f"firmware v{R.FIRMWARE}", style="green" if self.dev.firmware_matches(fw)
+        t.add_row(_("Catalogo"), Text(f"firmware v{R.FIRMWARE}", style="green" if self.dev.firmware_matches(fw)
                                    else "bold black on yellow"))
-        t.add_row("Puerto", f"{self.dev.port} @ {self.dev.baud}")
+        t.add_row(_("Puerto"), f"{self.dev.port} @ {self.dev.baud}")
         t.add_row("Checksum", "CRC16" if self.dev.use_crc else "8-bit")
         self.query_one("#dev-info", Static).update(t)
 
@@ -707,11 +774,11 @@ class VN300App(App):
         self.dev.close()
         self.live.stop_csv()
         self._render_info()
-        self.notify("Desconectado")
+        self.notify(_("Desconectado"))
 
     def _lost(self, err: str) -> None:
         self._stop_polling()
-        self.notify(f"Conexion perdida: {err}", severity="error", timeout=10)
+        self.notify(_("Conexion perdida: {0}").format(err), severity="error", timeout=10)
         self._render_info()
 
     # ------------------------------------------------------------------ #
@@ -770,7 +837,7 @@ class VN300App(App):
         for ch in charts:
             ch.frozen_at = now if frozen else None
             ch.refresh()
-        self.query_one("#btn-freeze", Button).label = "▶ Reanudar" if frozen else "⏸ Congelar"
+        self.query_one("#btn-freeze", Button).label = _("▶ Reanudar") if frozen else _("⏸ Congelar")
 
     @on(Select.Changed, "#sel-poll")
     def _poll_mode(self, ev: Select.Changed) -> None:
@@ -794,15 +861,15 @@ class VN300App(App):
         self._last_bytes, self._last_bytes_t = self.dev.stats["bytes"], now
         t = Text()
         if self.dev.connected:
-            t.append(" ● CONECTADO ", style="bold black on green")
+            t.append(_(" ● CONECTADO "), style="bold black on green")
             t.append(f"  {self.dev.port} @ {self.dev.baud}  ")
             t.append(f"{self.info.get('model', '')}  SN {self.info.get('serial', '')}  ", style="cyan")
             t.append(f"RX {self._bps / 1024:.1f} kB/s  ")
         else:
-            t.append(" ○ DESCONECTADO ", style="bold white on red")
-            t.append("  Ve a F1 para conectar  ")
+            t.append(_(" ○ DESCONECTADO "), style="bold white on red")
+            t.append(_("  Ve a F1 para conectar  "))
         if self.batch:
-            t.append(f" LOTE: {len(self.batch)} ", style="black on yellow")
+            t.append(_(" LOTE: {0} ").format(len(self.batch)), style="black on yellow")
             t.append(" ")
         if self.live.recording:
             t.append(f" ● REC {self.live.csv_rows} ", style="bold white on red")
@@ -817,17 +884,22 @@ class VN300App(App):
         s = self.dev.stats
         tr.add_row("Bytes", f"{s['bytes']:,}")
         tr.add_row("ASCII / BIN", f"{s['ascii']:,} / {s['binary']:,}")
-        tr.add_row("Tramas malas", f"{s['bad']:,}")
+        tr.add_row(_("Tramas malas"), f"{s['bad']:,}")
         tr.add_row("VNERR", f"{s['errors']:,}")
         self.query_one("#traffic", Static).update(tr)
         if self.live.recording:
-            self.query_one("#rec-info", Static).update(f"{self.live.csv_path}  ({self.live.csv_rows} filas)")
+            self.query_one("#rec-info", Static).update(_("{0}  ({1} filas)").format(self.live.csv_path, self.live.csv_rows))
 
     def _refresh_live(self) -> None:
         if not self.is_running or not self.screen.query("#att-text"):
             return
-        if self.query_one(TabbedContent).active != "tab-live":
+        active = self.query_one(TabbedContent).active
+        if active == "tab-3d":
+            self.query_one("#view3d-full", Attitude3D).refresh()
             return
+        if active != "tab-live":
+            return
+        self.query_one("#view3d-live", Attitude3D).refresh()
         L = self.live
         with L.lock:
             v = dict(L.v)
@@ -844,7 +916,7 @@ class VN300App(App):
             at.append(f"{name} ", style="bold")
             at.append(f"{fmt(val, 2, 8)}{unit}", style="bold yellow" if not stale("ypr") else "dim")
             at.append("\n")
-        at.append(f"fuente: {srcs.get('ypr', '-')}", style="dim")
+        at.append(_("fuente: {0}").format(srcs.get('ypr', '-')), style="dim")
         self.query_one("#att-text", Static).update(at)
         p, r = (ypr[1], ypr[2]) if not math.isnan(ypr[1]) else (0.0, 0.0)
         self.query_one("#horizon", Static).update(horizon(p, r))
@@ -855,7 +927,7 @@ class VN300App(App):
         a = v.get("accel") or [math.nan] * 3
         m = v.get("mag") or [math.nan] * 3
         ti = Table.grid(padding=(0, 1))
-        for _ in range(4):
+        for _i in range(4):
             ti.add_column(justify="right")
         ti.add_column()
         ti.add_row("", Text("X", style="bold"), Text("Y", style="bold"), Text("Z", style="bold"), "")
@@ -880,30 +952,30 @@ class VN300App(App):
             d = R.decode_ins_status(int(st))
             mode_style = {0: "black on yellow", 1: "black on yellow", 2: "bold black on green",
                           3: "bold white on red"}[d["mode"]]
-            tins.add_row("Modo", Text(f" {d['mode']} {d['mode_txt']} ", style=mode_style))
+            tins.add_row(_("Modo"), Text(f" {d['mode']} {d['mode_txt']} ", style=mode_style))
             tins.add_row("GPS fix", flag(d["gnss_fix"]))
-            tins.add_row("Compas GPS", flag(d["gnss_compass"], "OPERATIVO", "NO", False))
-            tins.add_row("Rumbo GPS→INS", flag(d["gnss_heading_ins"], "ALINEADO", "NO", False))
+            tins.add_row(_("Compas GPS"), flag(d["gnss_compass"], _("OPERATIVO"), "NO", False))
+            tins.add_row(_("Rumbo GPS→INS"), flag(d["gnss_heading_ins"], _("ALINEADO"), "NO", False))
             errs = [n for n, kk in (("IMU", "imu_err"), ("Mag/Pres", "magpres_err"), ("GPS", "gnss_err")) if d[kk]]
-            tins.add_row("Errores", Text(", ".join(errs), style="bold red") if errs else Text("ninguno", style="green"))
+            tins.add_row(_("Errores"), Text(", ".join(errs), style="bold red") if errs else Text(_("ninguno"), style="green"))
         else:
-            tins.add_row("Modo", Text("sin datos", style="dim"))
+            tins.add_row(_("Modo"), Text(_("sin datos"), style="dim"))
         lla = v.get("lla") or [math.nan] * 3
         vel = v.get("vel_ned") or [math.nan] * 3
         tins.add_row("Lat / Lon", f"{fmt(lla[0], 7, 12)}  {fmt(lla[1], 7, 12)}")
-        tins.add_row("Altitud", f"{fmt(lla[2], 2, 9)} m")
+        tins.add_row(_("Altitud"), f"{fmt(lla[2], 2, 9)} m")
         tins.add_row("Vel NED", " ".join(fmt(x, 2, 7) for x in vel) + " m/s")
-        tins.add_row("Incert. att/pos/vel",
+        tins.add_row(_("Incert. att/pos/vel"),
                      f"{fmt(v.get('att_unc'), 2, 5)}°  {fmt(v.get('pos_unc'), 2, 5)} m  {fmt(v.get('vel_unc'), 2, 5)} m/s")
         if stale("ins_status"):
-            tins.add_row("", Text("(dato antiguo)", style="dim"))
+            tins.add_row("", Text(_("(dato antiguo)"), style="dim"))
         self.query_one("#ins-text", Static).update(tins)
 
         # GPS
         tg = Table(box=None, padding=(0, 1), show_edge=False)
         tg.add_column("")
-        tg.add_column("Antena A", justify="right")
-        tg.add_column("Antena B", justify="right")
+        tg.add_column(_("Antena A"), justify="right")
+        tg.add_column(_("Antena B"), justify="right")
         g1, g2 = v.get("gnss1") or {}, v.get("gnss2") or {}
 
         def fixtxt(gg):
@@ -912,15 +984,15 @@ class VN300App(App):
             f = int(gg["fix"])
             return Text(R.GPS_FIX.get(f, str(f)), style="green" if f >= 3 else ("yellow" if f else "red"))
         tg.add_row("Fix", fixtxt(g1), fixtxt(g2))
-        tg.add_row("Satelites", str(g1.get("sats", "---")), str(g2.get("sats", "---")))
+        tg.add_row(_("Satelites"), str(g1.get("sats", "---")), str(g2.get("sats", "---")))
         def accs(gg):
             a = gg.get("acc") or [math.nan] * 3
             if not gg.get("fix") or any(x > 1e5 for x in a if not math.isnan(x)):
                 return [math.nan] * 3          # sin fix el receptor reporta valores enormes
             return a
         acc1, acc2 = accs(g1), accs(g2)
-        tg.add_row("Prec. N/E", f"{fmt(acc1[0], 2, 5)}/{fmt(acc1[1], 2, 5)}", f"{fmt(acc2[0], 2, 5)}/{fmt(acc2[1], 2, 5)}")
-        tg.add_row("Prec. vert", fmt(acc1[2], 2, 6), fmt(acc2[2], 2, 6))
+        tg.add_row(_("Prec. N/E"), f"{fmt(acc1[0], 2, 5)}/{fmt(acc1[1], 2, 5)}", f"{fmt(acc2[0], 2, 5)}/{fmt(acc2[1], 2, 5)}")
+        tg.add_row(_("Prec. vert"), fmt(acc1[2], 2, 6), fmt(acc2[2], 2, 6))
         l1 = g1.get("lla") or [math.nan] * 3
         tg.add_row("Lat", fmt(l1[0], 7, 12), "")
         tg.add_row("Lon", fmt(l1[1], 7, 12), "")
@@ -933,23 +1005,23 @@ class VN300App(App):
         pct = v.get("compass_pct")
         if pct is not None and not math.isnan(pct):
             n = int(pct / 5)
-            tc.add_row("Arranque", Text("█" * n + "░" * (20 - n) + f" {pct:3.0f}%",
+            tc.add_row(_("Arranque"), Text("█" * n + "░" * (20 - n) + f" {pct:3.0f}%",
                                         style="green" if pct >= 100 else "yellow"))
-            tc.add_row("Rumbo est.", f"{fmt(v.get('compass_heading'), 2, 8)}°")
+            tc.add_row(_("Rumbo est."), f"{fmt(v.get('compass_heading'), 2, 8)}°")
         h = v.get("health")
         if h:
             tc.add_row("Sats PVT A/B", f"{h[0]:.0f} / {h[3]:.0f}")
             tc.add_row("Sats RTK A/B", f"{h[1]:.0f} / {h[4]:.0f}")
             tc.add_row("CN0 max A/B", f"{h[2]:.0f} / {h[5]:.0f} dBHz")
-            tc.add_row("Comunes PVT/RTK", f"{h[6]:.0f} / {h[7]:.0f}")
+            tc.add_row(_("Comunes PVT/RTK"), f"{h[6]:.0f} / {h[7]:.0f}")
             if max(h) == 0:
-                tc.add_row("Diag.", Text("Sin senal GPS: revisa antenas y cielo despejado", style="red"))
+                tc.add_row(_("Diag."), Text(_("Sin senal GPS: revisa antenas y cielo despejado"), style="red"))
             elif h[2] < 40 and h[5] < 40:
-                tc.add_row("Diag.", Text("CN0 bajo: interior / bloqueo / jamming", style="red"))
+                tc.add_row(_("Diag."), Text(_("CN0 bajo: interior / bloqueo / jamming"), style="red"))
             elif h[1] < 5 or h[4] < 5:
-                tc.add_row("Diag.", Text("Pocos sats RTK: cielo parcialmente tapado", style="yellow"))
+                tc.add_row(_("Diag."), Text(_("Pocos sats RTK: cielo parcialmente tapado"), style="yellow"))
         if not pct and not h:
-            tc.add_row("", Text("sin datos", style="dim"))
+            tc.add_row("", Text(_("sin datos"), style="dim"))
         self.query_one("#compass-text", Static).update(tc)
 
     # ------------------------------------------------------------------ #
@@ -960,19 +1032,19 @@ class VN300App(App):
         btn = self.query_one("#btn-rec", Button)
         if self.live.recording:
             self.live.stop_csv()
-            btn.label = "● Grabar CSV"
-            self.notify(f"Grabacion guardada: {self.live.csv_path} ({self.live.csv_rows} filas)")
-            self.query_one("#rec-info", Static).update(f"Ultimo: {self.live.csv_path}")
+            btn.label = _("● Grabar CSV")
+            self.notify(_("Grabacion guardada: {0} ({1} filas)").format(self.live.csv_path, self.live.csv_rows))
+            self.query_one("#rec-info", Static).update(_("Ultimo: {0}").format(self.live.csv_path))
             return
         os.makedirs(os.path.expanduser("~/vn300_logs"), exist_ok=True)
         path = os.path.expanduser(f"~/vn300_logs/vn300_{datetime.now():%Y%m%d_%H%M%S}.csv")
         try:
             self.live.start_csv(path)
         except OSError as exc:
-            self.notify(f"No se pudo crear {path}: {exc}", severity="error")
+            self.notify(_("No se pudo crear {0}: {1}").format(path, exc), severity="error")
             return
-        btn.label = "■ Detener"
-        self.notify(f"Grabando en {path}")
+        btn.label = _("■ Detener")
+        self.notify(_("Grabando en {0}").format(path))
 
     # ------------------------------------------------------------------ #
     #  Salida asincrona y acciones del equipo
@@ -987,42 +1059,40 @@ class VN300App(App):
         if adof is not Select.NULL:
             items[7] = [str(adof)]
         if items:
-            self.run_writes(items, save=False, label="Salida asincrona")
+            self.run_writes(items, save=False, label=_("Salida asincrona"))
 
     @on(Button.Pressed, "#btn-async-pause")
     def _pause(self) -> None:
-        self.run_cmd(lambda: self.dev.async_pause(True), "Salida asincrona en pausa")
+        self.run_cmd(lambda: self.dev.async_pause(True), _("Salida asincrona en pausa"))
 
     @on(Button.Pressed, "#btn-async-resume")
     def _resume(self) -> None:
-        self.run_cmd(lambda: self.dev.async_pause(False), "Salida asincrona reanudada")
+        self.run_cmd(lambda: self.dev.async_pause(False), _("Salida asincrona reanudada"))
 
     @on(Button.Pressed, "#btn-wnv")
     def action_save_flash(self) -> None:
         def go(ok):
             if ok:
-                self.run_cmd(self.dev.write_settings, "Configuracion guardada en flash")
-        self.push_screen(Confirm("Guardar en flash",
-                                 "Se guardaran TODOS los registros actuales en memoria no volatil ($VNWNV).\n"
-                                 "El equipo debe estar quieto durante ~0.5 s.", "Guardar"), go)
+                self.run_cmd(self.dev.write_settings, _("Configuracion guardada en flash"))
+        self.push_screen(Confirm(_("Guardar en flash"),
+                                 _("Se guardaran TODOS los registros actuales en memoria no volatil ($VNWNV).\nEl equipo debe estar quieto durante ~0.5 s."), _("Guardar")), go)
 
     @on(Button.Pressed, "#btn-reset")
     def _reset(self) -> None:
         def go(ok):
             if ok:
-                self.run_cmd(self.dev.reset, "Equipo reiniciado")
-        self.push_screen(Confirm("Reset", "Se reiniciara el VN-300. Los cambios no guardados en flash se pierden.",
-                                 "Reiniciar"), go)
+                self.run_cmd(self.dev.reset, _("Equipo reiniciado"))
+        self.push_screen(Confirm("Reset", _("Se reiniciara el VN-300. Los cambios no guardados en flash se pierden."),
+                                 _("Reiniciar")), go)
 
     @on(Button.Pressed, "#btn-rfs")
     def _rfs(self) -> None:
         def go(ok):
             if ok:
-                self.run_cmd(self.dev.restore_factory, "Configuracion de fabrica restaurada")
-        self.push_screen(Confirm("Restaurar configuracion de fabrica",
-                                 "Se borrara TODA la configuracion guardada (baudrate, salidas, baseline, "
-                                 "offsets de antena…) y el equipo se reiniciara.\n\n¿Seguro?",
-                                 "Restaurar", danger=True), go)
+                self.run_cmd(self.dev.restore_factory, _("Configuracion de fabrica restaurada"))
+        self.push_screen(Confirm(_("Restaurar configuracion de fabrica"),
+                                 _("Se borrara TODA la configuracion guardada (baudrate, salidas, baseline, offsets de antena…) y el equipo se reiniciara.\n\n¿Seguro?"),
+                                 _("Restaurar"), danger=True), go)
 
     @work(thread=True, group="cmd")
     def run_cmd(self, fn, ok_msg: str) -> None:
@@ -1041,20 +1111,20 @@ class VN300App(App):
         """(texto estado, detalle) para la columna de la tabla."""
         st = self.reg_state.get(rid)
         if st is None:
-            return Text("· sin leer", style="dim"), Text("")
+            return Text(_("· sin leer"), style="dim"), Text("")
         if st == 8:
-            return Text("✕ no existe", style="grey50"), Text("VNERR 8: registro invalido", style="grey50")
+            return Text(_("✕ no existe"), style="grey50"), Text(_("VNERR 8: registro invalido"), style="grey50")
         if not isinstance(st, list):
-            txt = "sin respuesta" if st == "timeout" else f"VNERR {st}"
-            return Text("! error", style="bold red"), Text(txt, style="red")
+            txt = _("sin respuesta") if st == "timeout" else f"VNERR {st}"
+            return Text(_("! error"), style="bold red"), Text(txt, style="red")
         act = R.activity(rid, st)
         preview = ",".join(st)
         if act is None:
-            return Text("✓ responde", style="green"), Text(preview[:60], style="dim")
+            return Text(_("✓ responde"), style="green"), Text(preview[:60], style="dim")
         on_, detail = act
         if on_:
-            return Text("● ACTIVO", style="bold black on green"), Text(detail)
-        return Text("○ inactivo", style="black on yellow"), Text(detail, style="yellow")
+            return Text(_("● ACTIVO"), style="bold black on green"), Text(detail)
+        return Text(_("○ inactivo"), style="black on yellow"), Text(detail, style="yellow")
 
     def _reg_ids(self, scope: str) -> List[int]:
         known = [r.id for r in R.REGISTERS]
@@ -1107,12 +1177,12 @@ class VN300App(App):
     def _update_scan_info(self) -> None:
         resp = [rid for rid, st in self.reg_state.items() if isinstance(st, list)]
         if not self.reg_state:
-            self.query_one("#scan-info", Static).update("Pulsa 'Escanear equipo' para ver que registros existen y cuales estan activos.")
+            self.query_one("#scan-info", Static).update(_("Pulsa 'Escanear equipo' para ver que registros existen y cuales estan activos."))
             return
         active = sum(1 for rid in resp if (R.activity(rid, self.reg_state[rid]) or (False,))[0])
         undoc = sum(1 for rid in resp if rid not in R.BY_ID)
         self.query_one("#scan-info", Static).update(
-            f"Responden {len(resp)} registros ({undoc} sin documentar) · {active} configuraciones activas")
+            _("Responden {0} registros ({1} sin documentar) · {2} configuraciones activas").format(len(resp), undoc, active))
 
     def _set_reg_state(self, rid: int, st) -> None:
         """Actualiza una fila sin reconstruir la tabla."""
@@ -1155,9 +1225,9 @@ class VN300App(App):
 
     def _build_form(self, reg: R.Register, values: Optional[List[str]]) -> None:
         title = Text()
-        title.append(f"Registro {reg.id} — {reg.name}", style="bold")
+        title.append(_("Registro {0} — {1}").format(reg.id, reg.name), style="bold")
         title.append(f"   [{reg.group}] ", style="cyan")
-        title.append(" R/W " if reg.writable else " SOLO LECTURA ",
+        title.append(" R/W " if reg.writable else _(" SOLO LECTURA "),
                      style="black on green" if reg.writable else "black on grey50")
         if reg.async_header:
             title.append(f"  async: $VN{reg.async_header}", style="dim")
@@ -1166,7 +1236,7 @@ class VN300App(App):
         if reg.caution:
             desc += ("\n" if desc else "") + "⚠ " + reg.caution
         if values is None:
-            desc += ("\n" if desc else "") + "Valores aun no leidos: pulsa 'Leer'."
+            desc += ("\n" if desc else "") + _("Valores aun no leidos: pulsa 'Leer'.")
         self.query_one("#reg-desc", Static).update(desc)
 
         form = self.query_one("#reg-form", Vertical)
@@ -1186,11 +1256,11 @@ class VN300App(App):
                                    Static(hint, classes="field-hint"), classes="field-row"))
         if reg.variable:
             extra = ",".join(vals[len(reg.fields):])
-            w = Input(extra, placeholder="campos extra separados por coma (hex en reg 75-77)",
+            w = Input(extra, placeholder=_("campos extra separados por coma (hex en reg 75-77)"),
                       classes="field-input", disabled=not reg.writable)
             self.field_widgets.append((None, w))
-            rows.append(Horizontal(Label("Campos extra", classes="field-name"), w,
-                                   Static("OutputField por grupo, en hex", classes="field-hint"),
+            rows.append(Horizontal(Label(_("Campos extra"), classes="field-name"), w,
+                                   Static(_("OutputField por grupo, en hex"), classes="field-hint"),
                                    classes="field-row"))
         form.mount_all(rows)
         self.query_one("#btn-bin-wizard", Button).display = reg.id in (75, 76, 77)
@@ -1206,11 +1276,11 @@ class VN300App(App):
             except ValueError:
                 pass
             if norm in [v for _, v in opts] or cur == "":
-                sel = Select(opts, value=norm if norm else Select.NULL, prompt="(sin cambiar)" if f.optional else "elige",
+                sel = Select(opts, value=norm if norm else Select.NULL, prompt=_("(sin cambiar)") if f.optional else _("elige"),
                              classes="field-input")
                 return sel
         return Input(cur, classes="field-input", disabled=not writable,
-                     placeholder="opcional" if f.optional else "")
+                     placeholder=_("opcional") if f.optional else "")
 
     def _form_values(self) -> List[str]:
         out: List[str] = []
@@ -1240,7 +1310,7 @@ class VN300App(App):
     def scan_regs(self, notify_done: bool = True) -> None:
         """Lee los 256 IDs para saber cuales existen y su estado."""
         if not self.dev.connected:
-            self.call_from_thread(self.notify, "No conectado", severity="warning")
+            self.call_from_thread(self.notify, _("No conectado"), severity="warning")
             return
         pb = self.query_one("#batch-progress", ProgressBar)
 
@@ -1267,12 +1337,12 @@ class VN300App(App):
             self.call_from_thread(self._set_form_values, self.reg_cache[self.cur_reg.id])
         if notify_done:
             n = sum(1 for st in self.reg_state.values() if isinstance(st, list))
-            self.call_from_thread(self.notify, f"Escaneo completo: responden {n} de 256 registros")
+            self.call_from_thread(self.notify, _("Escaneo completo: responden {0} de 256 registros").format(n))
 
     @work(thread=True, group="regs")
     def read_regs(self, ids: List[int], show: bool) -> None:
         if not self.dev.connected:
-            self.call_from_thread(self.notify, "No conectado", severity="warning")
+            self.call_from_thread(self.notify, _("No conectado"), severity="warning")
             return
         errors = 0
         for rid in ids:
@@ -1289,7 +1359,7 @@ class VN300App(App):
         if show and self.cur_reg and self.cur_reg.id in ids and self.cur_reg.id in self.reg_cache:
             self.call_from_thread(self._set_form_values, self.reg_cache[self.cur_reg.id])
         if not show:
-            self.call_from_thread(self.notify, f"Leidos {len(ids) - errors}/{len(ids)} registros")
+            self.call_from_thread(self.notify, _("Leidos {0}/{1} registros").format(len(ids) - errors, len(ids)))
             if self.cur_reg and self.cur_reg.id in self.reg_cache:
                 self.call_from_thread(self._set_form_values, self.reg_cache[self.cur_reg.id])
 
@@ -1300,7 +1370,7 @@ class VN300App(App):
         try:
             return R.validate_values(reg, self._form_values())
         except ValueError as exc:
-            self.notify(f"Valor invalido: {exc}", severity="error", timeout=6)
+            self.notify(_("Valor invalido: {0}").format(exc), severity="error", timeout=6)
             return None
 
     @on(Button.Pressed, "#btn-write")
@@ -1319,14 +1389,14 @@ class VN300App(App):
         def go(ok):
             if ok:
                 self.run_writes({rid: vals}, save=True, label=f"Reg {rid}")
-        self.push_screen(Confirm("Escribir y guardar en flash",
-                                 f"$VNWRG,{rid},{','.join(vals)}\n\nY despues $VNWNV (guardar en flash).",
-                                 "Escribir + flash"), go)
+        self.push_screen(Confirm(_("Escribir y guardar en flash"),
+                                 _("$VNWRG,{0},{1}\n\nY despues $VNWNV (guardar en flash).").format(rid, ','.join(vals)),
+                                 _("Escribir + flash")), go)
 
     @work(thread=True, group="regs")
     def run_writes(self, items: Dict[int, List[str]], save: bool, label: str = "") -> None:
         if not self.dev.connected:
-            self.call_from_thread(self.notify, "No conectado", severity="warning")
+            self.call_from_thread(self.notify, _("No conectado"), severity="warning")
             return
         pb = self.query_one("#batch-progress", ProgressBar)
 
@@ -1349,11 +1419,11 @@ class VN300App(App):
                 self.call_from_thread(self._set_reg_state, rid, r)
         if bad:
             msg = "\n".join(f"Reg {rid}: {e}" for rid, e in bad.items())
-            self.call_from_thread(self.notify, f"Fallaron {len(bad)} escrituras:\n{msg}", severity="error", timeout=12)
+            self.call_from_thread(self.notify, _("Fallaron {0} escrituras:\n{1}").format(len(bad), msg), severity="error", timeout=12)
         ok = len(res) - len(bad)
         if ok:
-            self.call_from_thread(self.notify, f"{label}: {ok} registro(s) escritos" +
-                                  (" y guardados en flash" if save else " (en RAM; Ctrl+S para guardar)"))
+            self.call_from_thread(self.notify, _("{0}: {1} registro(s) escritos").format(label, ok) +
+                                  (_(" y guardados en flash") if save else _(" (en RAM; Ctrl+S para guardar)")))
         if self.cur_reg and self.cur_reg.id in res and self.cur_reg.id not in bad:
             self.call_from_thread(self._set_form_values, self.reg_cache[self.cur_reg.id])
         if 5 in res:
@@ -1367,7 +1437,7 @@ class VN300App(App):
             return
         self.batch[self.cur_reg.id] = vals
         self._render_batch()
-        self.notify(f"Reg {self.cur_reg.id} agregado al lote ({len(self.batch)} en total)")
+        self.notify(_("Reg {0} agregado al lote ({1} en total)").format(self.cur_reg.id, len(self.batch)))
 
     def _render_batch(self) -> None:
         t = self.query_one("#batch-table", DataTable)
@@ -1392,21 +1462,21 @@ class VN300App(App):
     @on(Button.Pressed, "#btn-batch-flash")
     def _batch_flash(self) -> None:
         if not self.batch:
-            self.notify("El lote esta vacio. Usa '+ Lote' o 'Importar config'.", severity="warning")
+            self.notify(_("El lote esta vacio. Usa '+ Lote' o 'Importar config'."), severity="warning")
             return
         body = "\n".join(f"$VNWRG,{rid},{','.join(v)}" for rid, v in sorted(self.batch.items()))
         items = dict(self.batch)
 
         def go(ok):
             if ok:
-                self.run_writes(items, save=True, label="Lote")
-        self.push_screen(Confirm(f"Flashear {len(items)} registros",
-                                 body + "\n\n+ $VNWNV (guardar en flash)", "Flashear", danger=True), go)
+                self.run_writes(items, save=True, label=_("Lote"))
+        self.push_screen(Confirm(_("Flashear {0} registros").format(len(items)),
+                                 body + _("\n\n+ $VNWNV (guardar en flash)"), _("Flashear"), danger=True), go)
 
     @on(Button.Pressed, "#btn-batch-save")
     def _batch_save(self) -> None:
         if not self.batch:
-            self.notify("El lote esta vacio", severity="warning")
+            self.notify(_("El lote esta vacio"), severity="warning")
             return
         os.makedirs(CONFIG_DIR, exist_ok=True)
         default = os.path.join(CONFIG_DIR, f"lote_{datetime.now():%Y%m%d_%H%M%S}.json")
@@ -1414,7 +1484,7 @@ class VN300App(App):
         def go(path):
             if path:
                 self._save_json(path, self.batch, "lote")
-        self.push_screen(AskPath("Guardar lote como…", default), go)
+        self.push_screen(AskPath(_("Guardar lote como…"), default), go)
 
     def _save_json(self, path: str, regs: Dict[int, List[str]], kind: str) -> None:
         data = {
@@ -1426,14 +1496,14 @@ class VN300App(App):
         try:
             with open(os.path.expanduser(path), "w") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
-            self.notify(f"Guardado {path} ({len(regs)} registros)")
+            self.notify(_("Guardado {0} ({1} registros)").format(path, len(regs)))
         except OSError as exc:
-            self.notify(f"No se pudo guardar: {exc}", severity="error")
+            self.notify(_("No se pudo guardar: {0}").format(exc), severity="error")
 
     @on(Button.Pressed, "#btn-export")
     def _export(self) -> None:
         if not self.dev.connected:
-            self.notify("Conecta primero para leer la configuracion", severity="warning")
+            self.notify(_("Conecta primero para leer la configuracion"), severity="warning")
             return
         os.makedirs(CONFIG_DIR, exist_ok=True)
         sn = self.info.get("serial", "vn300")
@@ -1442,7 +1512,7 @@ class VN300App(App):
         def go(path):
             if path:
                 self.export_config(path)
-        self.push_screen(AskPath("Exportar todos los registros configurables a…", default), go)
+        self.push_screen(AskPath(_("Exportar todos los registros configurables a…"), default), go)
 
     @work(thread=True, group="regs")
     def export_config(self, path: str) -> None:
@@ -1472,12 +1542,12 @@ class VN300App(App):
                     self.batch[int(rid)] = R.validate_values(reg, [str(x) for x in vals])
                     n += 1
                 self._render_batch()
-                self.notify(f"{n} registros cargados en el lote. Revisalos y pulsa 'Flashear lote'.")
+                self.notify(_("{0} registros cargados en el lote. Revisalos y pulsa 'Flashear lote'.").format(n))
             except Exception as exc:
-                self.notify(f"No se pudo importar: {exc}", severity="error", timeout=8)
+                self.notify(_("No se pudo importar: {0}").format(exc), severity="error", timeout=8)
         files = sorted(f for f in os.listdir(CONFIG_DIR) if f.endswith(".json"))
         default = os.path.join(CONFIG_DIR, files[-1]) if files else os.path.join(CONFIG_DIR, "config.json")
-        self.push_screen(AskPath("Importar configuracion (JSON) al lote", default), go)
+        self.push_screen(AskPath(_("Importar configuracion (JSON) al lote"), default), go)
 
     @on(Button.Pressed, "#btn-bin-wizard")
     def _bin_wizard_from_regs(self) -> None:
@@ -1490,10 +1560,10 @@ class VN300App(App):
                 return
             if to_form:
                 self._set_form_values(vals)
-                self.notify("Valores cargados en el formulario. Pulsa 'Escribir' o 'Escribir + flash'.")
+                self.notify(_("Valores cargados en el formulario. Pulsa 'Escribir' o 'Escribir + flash'."))
             else:
                 self.query_one("#bin-out", Static).update(f"$VNWRG,{rid},{','.join(vals)}")
-                self.run_writes({rid: vals}, save=False, label=f"Salida binaria {rid}")
+                self.run_writes({rid: vals}, save=False, label=_("Salida binaria {0}").format(rid))
         self.push_screen(BinaryWizard(rid, current), go)
 
     # ------------------------------------------------------------------ #
@@ -1546,18 +1616,18 @@ class VN300App(App):
     @on(Button.Pressed, "#btn-hsi-start")
     def _hsi_start(self) -> None:
         rate = self.query_one("#sel-hsi-rate", Select).value
-        self.run_writes({44: ["1", "3", str(rate)]}, save=False, label="HSI iniciado")
-        self.query_one("#hsi-out", Static).update("Calibrando… gira el equipo lentamente en todas las direcciones.")
+        self.run_writes({44: ["1", "3", str(rate)]}, save=False, label=_("HSI iniciado"))
+        self.query_one("#hsi-out", Static).update(_("Calibrando… gira el equipo lentamente en todas las direcciones."))
 
     @on(Button.Pressed, "#btn-hsi-stop")
     def _hsi_stop(self) -> None:
         rate = self.query_one("#sel-hsi-rate", Select).value
-        self.run_writes({44: ["0", "3", str(rate)]}, save=False, label="HSI detenido")
+        self.run_writes({44: ["0", "3", str(rate)]}, save=False, label=_("HSI detenido"))
 
     @on(Button.Pressed, "#btn-hsi-reset")
     def _hsi_reset(self) -> None:
         rate = self.query_one("#sel-hsi-rate", Select).value
-        self.run_writes({44: ["2", "3", str(rate)]}, save=False, label="HSI reiniciado")
+        self.run_writes({44: ["2", "3", str(rate)]}, save=False, label=_("HSI reiniciado"))
 
     @on(Button.Pressed, "#btn-hsi-read")
     def _hsi_read(self) -> None:
@@ -1572,31 +1642,31 @@ class VN300App(App):
             self.call_from_thread(self.notify, str(exc), severity="error")
             return
         self.reg_cache[47] = v
-        t = Table(title="Solucion HSI (reg 47)", box=None)
+        t = Table(title=_("Solucion HSI (reg 47)"), box=None)
         for h in ("", "C[.,0]", "C[.,1]", "C[.,2]", "B"):
             t.add_column(h, justify="right")
         for i in range(3):
-            t.add_row(f"fila {i}", *v[i * 3:i * 3 + 3], v[9 + i])
+            t.add_row(_("fila {0}").format(i), *v[i * 3:i * 3 + 3], v[9 + i])
         mode = {0: "OFF", 1: "RUN", 2: "RESET"}.get(int(ctl[0]), ctl[0])
         self.call_from_thread(self.query_one("#hsi-out", Static).update, t)
-        self.call_from_thread(self.notify, f"HSI modo {mode}, salida {ctl[1]}, velocidad {ctl[2]}")
+        self.call_from_thread(self.notify, _("HSI modo {0}, salida {1}, velocidad {2}").format(mode, ctl[1], ctl[2]))
 
     @on(Button.Pressed, "#btn-hsi-copy")
     def _hsi_copy(self) -> None:
         v = self.reg_cache.get(47)
         if not v:
-            self.notify("Primero 'Leer solucion'", severity="warning")
+            self.notify(_("Primero 'Leer solucion'"), severity="warning")
             return
         self.batch[23] = list(v)
         self._render_batch()
-        self.notify("Solucion HSI agregada al lote como registro 23 (ve a F3 para flashear).")
+        self.notify(_("Solucion HSI agregada al lote como registro 23 (ve a F3 para flashear)."))
 
     def _mount_matrix(self) -> Optional[List[float]]:
         try:
             y, p, r = (math.radians(float(self.query_one(f"#mnt-{k}", Input).value or 0))
                        for k in ("yaw", "pitch", "roll"))
         except ValueError:
-            self.notify("Angulos invalidos", severity="error")
+            self.notify(_("Angulos invalidos"), severity="error")
             return None
         cy, sy, cp, sp, cr, sr = math.cos(y), math.sin(y), math.cos(p), math.sin(p), math.cos(r), math.sin(r)
         # R (vehiculo -> sensor) = Rx(r) Ry(p) Rz(y);  C = R^T (sensor -> vehiculo)
@@ -1610,8 +1680,8 @@ class VN300App(App):
     def _mnt_calc(self) -> None:
         m = self._mount_matrix()
         if m:
-            t = Table(box=None, title="C (sensor → vehiculo)")
-            for _ in range(3):
+            t = Table(box=None, title=_("C (sensor → vehiculo)"))
+            for _i in range(3):
                 t.add_column(justify="right")
             for i in range(3):
                 t.add_row(*[f"{x:+.6f}" for x in m[i * 3:i * 3 + 3]])
@@ -1627,10 +1697,9 @@ class VN300App(App):
         def go(ok):
             if ok:
                 self.mount_write(vals)
-        self.push_screen(Confirm("Escribir matriz de montaje",
-                                 f"$VNWRG,26,{','.join(vals)}\n+ $VNWNV + $VNRST\n\n"
-                                 "El equipo se reiniciara y el filtro volvera a converger.",
-                                 "Aplicar", danger=True), go)
+        self.push_screen(Confirm(_("Escribir matriz de montaje"),
+                                 _("$VNWRG,26,{0}\n+ $VNWNV + $VNRST\n\nEl equipo se reiniciara y el filtro volvera a converger.").format(','.join(vals)),
+                                 _("Aplicar"), danger=True), go)
 
     @work(thread=True, group="regs")
     def mount_write(self, vals: List[str]) -> None:
@@ -1638,7 +1707,7 @@ class VN300App(App):
             self.dev.write_register(26, vals)
             self.dev.write_settings()
             self.dev.reset()
-            self.call_from_thread(self.notify, "Matriz de montaje aplicada (guardada y reiniciado)")
+            self.call_from_thread(self.notify, _("Matriz de montaje aplicada (guardada y reiniciado)"))
         except Exception as exc:
             self.call_from_thread(self.notify, str(exc), severity="error", timeout=8)
 
@@ -1651,10 +1720,9 @@ class VN300App(App):
         def go(ok):
             if ok:
                 self.bias_save(gyro)
-        self.push_screen(Confirm("Guardar bias de arranque",
-                                 f"{cmd} copia los bias estimados al registro 74 y despues $VNWNV los "
-                                 "guarda en flash.\n\nEl equipo debe estar quieto y con el filtro convergido.",
-                                 "Guardar"), go)
+        self.push_screen(Confirm(_("Guardar bias de arranque"),
+                                 _("{0} copia los bias estimados al registro 74 y despues $VNWNV los guarda en flash.\n\nEl equipo debe estar quieto y con el filtro convergido.").format(cmd),
+                                 _("Guardar")), go)
 
     @work(thread=True, group="regs")
     def bias_save(self, gyro: bool) -> None:
@@ -1667,7 +1735,7 @@ class VN300App(App):
             return
         self.reg_cache[74] = vals
         self.call_from_thread(self._show_bias, vals)
-        self.call_from_thread(self.notify, "Bias copiado al registro 74 y guardado en flash")
+        self.call_from_thread(self.notify, _("Bias copiado al registro 74 y guardado en flash"))
 
     @on(Button.Pressed, "#btn-read74")
     def _read74(self) -> None:

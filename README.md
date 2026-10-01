@@ -1,93 +1,113 @@
-# vn300ctl — VN-300 Control para Linux
+# vn300ctl — VN-300 Control for Linux
 
-Aplicación de consola para el **VectorNav VN-300**, inspirada en VectorNav Control Center:
-visualización en vivo, lectura y escritura de registros, y flasheo de uno o varios registros.
-Toda la configuración sigue el manual **UM005 para firmware v0.5.0.0 (Document Revision 2.22)**:
-los 51 registros que documenta, sus campos y opciones, los comandos (`$VNRRG/$VNWRG/$VNWNV/$VNRFS/
-$VNRST/$VNASY/$VNBOM/$VNSGB/$VNSFB`), checksum de 8 bits o CRC16 y la salida binaria `0xFA`.
-Si el equipo tiene otro firmware, la app lo avisa al conectar. Los IDs que responda y no estén en
-ese manual aparecen como "sin documentar" (lectura y escritura en crudo).
+[Español](README.es.md) · **English**
 
-## Arranque
+Terminal application for the **VectorNav VN-300**, inspired by VectorNav Control Center:
+live view, 3D attitude view, register reading and writing, and flashing one or several registers.
+All configuration follows the **UM005 manual for firmware v0.5.0.0 (Document Revision 2.22)**:
+the 51 registers it documents, their fields and options, the commands (`$VNRRG/$VNWRG/$VNWNV/$VNRFS/
+$VNRST/$VNASY/$VNBOM/$VNSGB/$VNSFB`), 8-bit checksum or CRC16, and the `0xFA` binary output.
+If the device runs other firmware, the app warns you when connecting. IDs that respond but are not in
+that manual show up as "undocumented" (raw read and write).
+
+The interface, the command line and `vn300.sh` work in **English and Spanish** (see [Language](#language)).
+
+## Getting started
 
 ```bash
-./vn300                          # abre la interfaz; elige el puerto en F1
-./vn300 -p /dev/ttyUSB0          # conecta directamente (baudrate autodetectado)
-./vn300 -p sim                   # simulador, para probar sin el equipo
+./vn300                          # opens the interface; choose the port in F1
+./vn300 -p /dev/ttyUSB0          # connects straight away (baudrate auto-detected)
+./vn300 -p sim                   # simulator, to try it without the device
+./vn300 --lang es                # interface in Spanish (or VN300_LANG=es)
 ```
 
-La primera vez, `./vn300` crea `.venv/` e instala `textual` y `pyserial`.
-Si no tienes permiso sobre el puerto: `sudo usermod -aG dialout $USER` y vuelve a iniciar sesión.
+The first time, `./vn300` creates `.venv/` and installs `textual` and `pyserial`.
+If you don't have permission on the port: `sudo usermod -aG dialout $USER`, then log out and back in.
 
-## Interfaz (teclas F1–F5)
+## Interface (keys F1–F6)
 
-| Pestaña | Qué hace |
+| Tab | What it does |
 |---|---|
-| **F1 Conexión** | Puerto, baudrate (auto), info del equipo, salida ASCII asíncrona (reg 6/7), pausar/reanudar, guardar en flash, reset y restaurar fábrica |
-| **F2 En vivo** | Actitud (horizonte y cinta de rumbo), IMU, estado INS, GPS A/B, compás GPS. Gráficas braille de alta resolución (Pitch/Roll, Yaw, Gyro, Accel, Mag, Velocidad) con ventana de 2–60 s y congelar (Ctrl+F). Lee el flujo ASCII o binario que ya emita el equipo (si solo manda cuaternión, calcula YPR) y consulta lo que falte. **Grabar CSV** (Ctrl+R) en `~/vn300_logs/` |
-| **F3 Registros** | Escaneo de los 256 IDs al conectar: columna **Estado** (● ACTIVO / ○ inactivo / ✓ responde / ✕ no existe) con detalle (p.ej. salida binaria a 100 Hz, velocity aiding activo). Filtro: documentados + detectados, solo los que responden, solo activos, todos. Formulario por campo, **Leer**, **Escribir** (RAM), **Escribir + flash**, **+ Lote** para flashear varios, exportar/importar JSON (`~/vn300_configs/`). Los registros sin documentar se pueden leer y escribir en crudo |
-| **F4 Consola** | Terminal ASCII: escribe `RRG,8` o `WRG,7,40`; `$VN` y el checksum se añaden solos. Los errores `VNERR` se traducen |
-| **F5 Herramientas** | Calibración hard/soft iron (reg 44/47 → 23), bias de arranque con `$VNSGB`/`$VNSFB` (→ reg 74), matriz de montaje a partir de yaw/pitch/roll (reg 26) y asistente de salida binaria (reg 75–77) con casillas |
+| **F1 Connection** | Port, baudrate (auto), device info, ASCII async output (reg 6/7), pause/resume, save to flash, reset and factory reset. **Language** selector |
+| **F2 Live** | Attitude (horizon, heading tape and **3D view**), IMU, INS status, GPS A/B, GPS compass. High-resolution braille charts (Pitch/Roll, Yaw, Gyro, Accel, Mag, Velocity) with a 2–60 s window and freeze (Ctrl+F). Reads the ASCII or binary stream the device already outputs (if it only sends a quaternion, YPR is computed) and polls whatever is missing. **Record CSV** (Ctrl+R) to `~/vn300_logs/` |
+| **F3 Registers** | Scans all 256 IDs on connect: **Status** column (● ACTIVE / ○ inactive / ✓ responds / ✕ missing) with detail (e.g. binary output at 100 Hz, velocity aiding active). Filter: documented + detected, responding only, active only, all. Per-field form, **Read**, **Write** (RAM), **Write + flash**, **+ Batch** to flash several, JSON export/import (`~/vn300_configs/`). Undocumented registers can be read and written raw |
+| **F4 Console** | ASCII terminal: type `RRG,8` or `WRG,7,40`; `$VN` and the checksum are added for you. `VNERR` errors are explained |
+| **F5 Tools** | Hard/soft iron calibration (reg 44/47 → 23), startup bias with `$VNSGB`/`$VNSFB` (→ reg 74), mounting matrix from yaw/pitch/roll (reg 26) and a binary output wizard (reg 75–77) with checkboxes |
+| **F6 3D view** | Full-screen 3D VN-300 turning with yaw/pitch/roll in real time: the box with its front face (+X) in orange, a forward arrow, the body X/Y/Z axes and an NED floor with North marked. Drag with the mouse to orbit the camera, wheel to zoom, double-click to reset (or arrow keys, `+`/`-` and `r`) |
 
-`Ctrl+S` guarda en flash (`$VNWNV`); `Ctrl+Q` sale.
+`Ctrl+S` saves to flash (`$VNWNV`); `Ctrl+Q` quits.
 
-**Escribir y flashear no es lo mismo:** *Escribir* cambia el registro en RAM, y el cambio se pierde
-al reiniciar. *Flash* ejecuta además `$VNWNV`, que guarda **todos** los registros en memoria no volátil.
-El equipo debe estar quieto mientras guarda.
+**Writing and flashing are not the same:** *Write* changes the register in RAM, and the change is lost
+on restart. *Flash* also runs `$VNWNV`, which saves **all** registers to non-volatile memory.
+Keep the device still while it saves.
 
-## Script con modos: `vn300.sh`
+## Language
+
+The interface, the command line and `vn300.sh` work in Spanish and English. The language is chosen in
+this order of priority: `--lang es|en`, the `VN300_LANG` variable, the F1 selector (remembered in
+`~/.config/vn300ctl/settings.json`) and, if none is set, the system language. Changing it in F1 restarts
+the interface and reconnects to the same port.
+
+## Script with modes: `vn300.sh`
 
 ```bash
-./vn300.sh                       # menu interactivo
-./vn300.sh ayuda                 # todos los modos
-./vn300.sh ui | sim | monitor | info | leer 8 63 | escribir 6 14 -- 7 40 --flash
-./vn300.sh salida ymr 50 --flash | respaldo | restaurar | grabar 60 | doctor | latencia
+./vn300.sh                       # interactive menu
+./vn300.sh help                  # every mode
+./vn300.sh ui | sim | monitor | info | read 8 63 | write 6 14 -- 7 40 --flash
+./vn300.sh output ymr 50 --flash | backup | restore | log 60 | doctor | latency
 ```
 
-`doctor` revisa permisos, ModemManager y el `latency_timer` del FTDI; `latencia` lo pone a 1 ms (sudo).
-Puerto por defecto: `VN300_PORT` o el FTDI en `/dev/serial/by-id`.
+The Spanish mode names work too (`ayuda`, `leer`, `escribir`, `salida`, `respaldo`, `restaurar`, `grabar`, `latencia`).
+`doctor` checks permissions, ModemManager and the FTDI `latency_timer`; `latency` sets it to 1 ms (sudo).
+Default port: `VN300_PORT` or the FTDI in `/dev/serial/by-id`.
 
-## Registros 50/51 (velocity aiding)
+## Registers 50/51 (velocity aiding)
 
-No están en el manual de firmware v0.5.0.0, así que la app no los define: si el equipo los
-responde, salen en F3 como "sin documentar" y se pueden leer o escribir en crudo. En los manuales
-VN-100 son *Velocity Compensation Measurement* (50) y *Control* (51), y solo compensan la aceleración
-centrípeta del filtro de actitud. No son una entrada de odometría para el INS.
+They are not in the firmware v0.5.0.0 manual, so the app does not define them: if the device answers
+them, they show up in F3 as "undocumented" and can be read or written raw. In the VN-100 manuals they are
+*Velocity Compensation Measurement* (50) and *Control* (51), and they only compensate the centripetal
+acceleration of the attitude filter. They are not an odometry input for the INS.
 
-## Línea de comandos (para scripts)
+## Command line (for scripts)
 
 ```bash
 ./vn300 ports
 ./vn300 -p /dev/ttyUSB0 info
 ./vn300 -p /dev/ttyUSB0 read 8 63 98
-./vn300 -p /dev/ttyUSB0 write 7 40                       # un registro, solo RAM
-./vn300 -p /dev/ttyUSB0 write 6 14 -- 7 40 --flash       # varios + guardar en flash
-./vn300 -p /dev/ttyUSB0 write 57 0.12 0 -0.30 --flash -y # sin confirmación
-./vn300 -p /dev/ttyUSB0 dump -o mi_config.json           # respaldo de la configuración
-./vn300 -p /dev/ttyUSB0 flash mi_config.json             # restaura o clona la configuración
-./vn300 -p /dev/ttyUSB0 monitor                          # actitud e INS en texto plano
+./vn300 -p /dev/ttyUSB0 write 7 40                       # one register, RAM only
+./vn300 -p /dev/ttyUSB0 write 6 14 -- 7 40 --flash       # several + save to flash
+./vn300 -p /dev/ttyUSB0 write 57 0.12 0 -0.30 --flash -y # no confirmation
+./vn300 -p /dev/ttyUSB0 dump -o my_config.json           # configuration backup
+./vn300 -p /dev/ttyUSB0 flash my_config.json             # restore or clone the configuration
+./vn300 -p /dev/ttyUSB0 monitor                          # attitude and INS as plain text
 ./vn300 -p /dev/ttyUSB0 cmd "RRG,5"
 ./vn300 -p /dev/ttyUSB0 save | reset | factory
-./vn300 -p /dev/ttyUSB0 sgb --flash                      # $VNSGB: bias del giroscopo -> reg 74
-./vn300 -p /dev/ttyUSB0 sfb --flash                      # $VNSFB: bias del filtro INS -> reg 74
-./vn300 regs                                             # catálogo de registros
+./vn300 -p /dev/ttyUSB0 sgb --flash                      # $VNSGB: gyro bias -> reg 74
+./vn300 -p /dev/ttyUSB0 sfb --flash                      # $VNSFB: INS filter bias -> reg 74
+./vn300 regs                                             # register catalog
+./vn300 --lang en --help                                 # help in English
 ```
 
-## Notas
+## Notes
 
-- Al cambiar el baudrate (reg 5), la app comprueba a qué velocidad quedó el puerto y se reconecta.
-  En un lote, el reg 5 se escribe al final para no cortar la secuencia.
-- Si el equipo usa CRC16 (reg 30, `SerialChecksum=3`), se detecta en la primera respuesta y se usa CRC.
-- No incluye la actualización de firmware (`$VNFWU`, protocolo AN013).
+- When you change the baudrate (reg 5), the app checks which speed the port ended up at and reconnects.
+  In a batch, reg 5 is written last so the sequence isn't cut off.
+- If the device uses CRC16 (reg 30, `SerialChecksum=3`), it is detected on the first reply and CRC is used.
+- Firmware update (`$VNFWU`, AN013 protocol) is not included.
+- Configuration JSON files keep their Spanish keys (`registros`, `valores`, ...) in both languages, so
+  exports from either language can be imported by the other.
 
-## Estructura
+## Layout
 
 ```
-vn300ctl/protocol.py   checksum/CRC, tramas ASCII, parser binario (tablas del manual §5)
-vn300ctl/registers.py  catálogo de los 51 registros del firmware v0.5.0.0: campos, opciones, validación
-vn300ctl/device.py     puerto serie, hilo lector, comandos con reintentos, autobaud, flash por lotes
-vn300ctl/livestate.py  estado en vivo unificado (ASCII, binario o consulta) y CSV
-vn300ctl/sim.py        VN-300 simulado
-vn300ctl/tui.py        interfaz Textual
-vn300ctl/cli.py        subcomandos
+vn300ctl/protocol.py   checksum/CRC, ASCII frames, binary parser (manual tables §5)
+vn300ctl/registers.py  catalog of the 51 firmware v0.5.0.0 registers: fields, options, validation
+vn300ctl/device.py     serial port, reader thread, commands with retries, autobaud, batch flashing
+vn300ctl/livestate.py  unified live state (ASCII, binary or polling) and CSV
+vn300ctl/sim.py        simulated VN-300
+vn300ctl/tui.py        Textual interface
+vn300ctl/view3d.py     3D attitude view (rasterized in the terminal)
+vn300ctl/charts.py     braille charts
+vn300ctl/i18n.py       language; English translations in i18n_en.py
+vn300ctl/cli.py        subcommands
 ```

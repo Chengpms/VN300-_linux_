@@ -13,6 +13,8 @@ escribe el usuario antes de mandarlo al equipo.
 
 from __future__ import annotations
 
+from .i18n import _
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence
 
@@ -33,11 +35,11 @@ class Field:
         """Devuelve el texto normalizado o lanza ValueError."""
         t = text.strip()
         if t == "" and self.kind != "str":
-            raise ValueError(f"{self.name}: vacio")
+            raise ValueError(_("{0}: vacio").format(self.name))
         if self.kind == "str":
             bad = set("$,*")
             if any(c in bad or not (0x20 <= ord(c) <= 0x7E) for c in t):
-                raise ValueError(f"{self.name}: no se permiten '$', ',' ni '*'")
+                raise ValueError(_("{0}: no se permiten '$', ',' ni '*'").format(self.name))
             return t[:20]
         if self.kind == "hex":
             int(t, 16)
@@ -49,10 +51,10 @@ class Field:
         lim = {"u8": (0, 0xFF), "u16": (0, 0xFFFF), "u32": (0, 0xFFFFFFFF),
                "i32": (-2**31, 2**31 - 1)}.get(self.kind)
         if lim and not (lim[0] <= v <= lim[1]):
-            raise ValueError(f"{self.name}: fuera de rango {lim}")
+            raise ValueError(_("{0}: fuera de rango {1}").format(self.name, lim))
         if self.choices and v not in self.choices:
             opts = ", ".join(f"{k}={n}" for k, n in self.choices.items())
-            raise ValueError(f"{self.name}: valor {v} no valido ({opts})")
+            raise ValueError(_("{0}: valor {1} no valido ({2})").format(self.name, v, opts))
         return str(v)
 
 
@@ -93,8 +95,8 @@ def _comp(bias_unit: str) -> List[Field]:
     return _matrix() + [Field(f"B[{i}]", "f", bias_unit) for i in range(3)]
 
 
-PORT = Field("SerialPort", "u8", "", "Opcional: 1 o 2. Vacio = puerto activo",
-             {1: "Puerto 1", 2: "Puerto 2"}, optional=True)
+PORT = Field("SerialPort", "u8", "", _("Opcional: 1 o 2. Vacio = puerto activo"),
+             {1: _("Puerto 1"), 2: _("Puerto 2")}, optional=True)
 
 BAUDS = [9600, 19200, 38400, 57600, 115200, 128000, 230400, 460800, 921600]
 
@@ -106,7 +108,7 @@ ADOR = {
 }
 ADOF = [1, 2, 4, 5, 10, 20, 25, 40, 50, 100, 200]
 
-GPS_FIX = {0: "Sin fix", 1: "Solo tiempo", 2: "2D", 3: "3D"}
+GPS_FIX = {0: _("Sin fix"), 1: _("Solo tiempo"), 2: "2D", 3: "3D"}
 
 GPS_SOL = [
     Field("Time", "d", "s", "GPS time of week"), Field("Week", "u16", "week"),
@@ -131,65 +133,64 @@ GYR = _xyz("Gyro", "rad/s")
 
 REGISTERS: List[Register] = [
     # ---------------- Sistema -------------------------------------------- #
-    Register(0, "User Tag", "Sistema", True,
-             [Field("Tag", "str", "", "Hasta 20 caracteres ASCII imprimibles")],
-             "Etiqueta libre del usuario. Se guarda en flash con Write Settings."),
-    Register(1, "Model Number", "Sistema", False, [Field("Product", "str")]),
-    Register(2, "Hardware Revision", "Sistema", False, [Field("Revision", "u32")]),
-    Register(3, "Serial Number", "Sistema", False, [Field("SerialNum", "u32")]),
-    Register(4, "Firmware Version", "Sistema", False, [Field("Version", "str", "", "Major.Minor.Feature.HotFix")]),
-    Register(5, "Serial Baud Rate", "Sistema", True,
-             [Field("BaudRate", "u32", "baud", "Velocidad del puerto",
+    Register(0, "User Tag", _("Sistema"), True,
+             [Field("Tag", "str", "", _("Hasta 20 caracteres ASCII imprimibles"))],
+             _("Etiqueta libre del usuario. Se guarda en flash con Write Settings.")),
+    Register(1, "Model Number", _("Sistema"), False, [Field("Product", "str")]),
+    Register(2, "Hardware Revision", _("Sistema"), False, [Field("Revision", "u32")]),
+    Register(3, "Serial Number", _("Sistema"), False, [Field("SerialNum", "u32")]),
+    Register(4, "Firmware Version", _("Sistema"), False, [Field("Version", "str", "", "Major.Minor.Feature.HotFix")]),
+    Register(5, "Serial Baud Rate", _("Sistema"), True,
+             [Field("BaudRate", "u32", "baud", _("Velocidad del puerto"),
                     {b: str(b) for b in BAUDS}), PORT],
-             "Velocidad del puerto serie.",
-             caution="Al cambiar el baudrate del puerto activo la app se reconecta "
-                     "automaticamente a la nueva velocidad."),
-    Register(6, "Async Data Output Type", "Sistema", True,
-             [Field("ADOR", "u32", "", "Mensaje ASCII asincrono", ADOR), PORT],
-             "Que registro se emite automaticamente en ASCII."),
-    Register(7, "Async Data Output Freq", "Sistema", True,
-             [Field("ADOF", "u32", "Hz", "Frecuencia de salida ASCII",
-                    {0: "0 (sin salida)", **{f: f"{f} Hz" for f in ADOF}}), PORT]),
-    Register(30, "Communication Protocol Control", "Sistema", True, [
-        Field("SerialCount", "u8", "", "Contador anexado a mensajes async",
+             _("Velocidad del puerto serie."),
+             caution=_("Al cambiar el baudrate del puerto activo la app se reconecta automaticamente a la nueva velocidad.")),
+    Register(6, "Async Data Output Type", _("Sistema"), True,
+             [Field("ADOR", "u32", "", _("Mensaje ASCII asincrono"), ADOR), PORT],
+             _("Que registro se emite automaticamente en ASCII.")),
+    Register(7, "Async Data Output Freq", _("Sistema"), True,
+             [Field("ADOF", "u32", "Hz", _("Frecuencia de salida ASCII"),
+                    {0: _("0 (sin salida)"), **{f: f"{f} Hz" for f in ADOF}}), PORT]),
+    Register(30, "Communication Protocol Control", _("Sistema"), True, [
+        Field("SerialCount", "u8", "", _("Contador anexado a mensajes async"),
               {0: "OFF", 1: "SyncIn count", 2: "SyncIn time", 3: "SyncOut count", 4: "GPS PPS time"}),
-        Field("SerialStatus", "u8", "", "Estado anexado", {0: "OFF", 1: "VPE status", 2: "INS status"}),
+        Field("SerialStatus", "u8", "", _("Estado anexado"), {0: "OFF", 1: "VPE status", 2: "INS status"}),
         Field("SPICount", "u8", "", "", {0: "OFF", 1: "SyncIn count", 2: "SyncIn time", 3: "SyncOut count", 4: "GPS PPS time"}),
         Field("SPIStatus", "u8", "", "", {0: "OFF", 1: "VPE status", 2: "INS status"}),
         Field("SerialChecksum", "u8", "", "", {1: "8-bit checksum", 3: "16-bit CRC"}),
         Field("SPIChecksum", "u8", "", "", {0: "OFF", 1: "8-bit checksum", 3: "16-bit CRC"}),
-        Field("ErrorMode", "u8", "", "", {0: "Ignorar", 1: "Enviar error", 2: "Enviar error y ADOR=OFF"}),
+        Field("ErrorMode", "u8", "", "", {0: _("Ignorar"), 1: _("Enviar error"), 2: _("Enviar error y ADOR=OFF")}),
     ]),
-    Register(32, "Synchronization Control", "Sistema", True, [
+    Register(32, "Synchronization Control", _("Sistema"), True, [
         Field("SyncInMode", "u8", "", "", {3: "COUNT", 4: "IMU", 5: "ASYNC", 6: "ASYNC3"}),
-        Field("SyncInEdge", "u8", "", "", {0: "Flanco subida", 1: "Flanco bajada"}),
+        Field("SyncInEdge", "u8", "", "", {0: _("Flanco subida"), 1: _("Flanco bajada")}),
         Field("SyncInSkipFactor", "u16"),
         Field("Reserved", "u32"),
         Field("SyncOutMode", "u8", "", "", {0: "NONE", 1: "IMU_START", 2: "IMU_READY", 3: "INS", 6: "GPS_PPS"}),
-        Field("SyncOutPolarity", "u8", "", "", {0: "Pulso negativo", 1: "Pulso positivo"}),
+        Field("SyncOutPolarity", "u8", "", "", {0: _("Pulso negativo"), 1: _("Pulso positivo")}),
         Field("SyncOutSkipFactor", "u16"),
         Field("SyncOutPulseWidth", "u32", "ns"),
         Field("Reserved", "u32"),
     ]),
-    Register(33, "Synchronization Status", "Sistema", True, [
+    Register(33, "Synchronization Status", _("Sistema"), True, [
         Field("SyncInCount", "u32"), Field("SyncInTime", "u32", "us"), Field("SyncOutCount", "u32"),
     ]),
-    *[Register(rid, f"Binary Output {n}", "Sistema", True, [
-        Field("AsyncMode", "u16", "", "", {0: "Ninguno", 1: "Puerto 1", 2: "Puerto 2", 3: "Ambos"}),
+    *[Register(rid, f"Binary Output {n}", _("Sistema"), True, [
+        Field("AsyncMode", "u16", "", "", {0: _("Ninguno"), 1: _("Puerto 1"), 2: _("Puerto 2"), 3: _("Ambos")}),
         Field("RateDivisor", "u16", "", "400 Hz / divisor"),
-        Field("OutputGroup", "hex", "", "Bits de grupos activos (hex)"),
-        ], "Mensaje binario configurable. Usa el boton 'Asistente binario' para armarlo.",
+        Field("OutputGroup", "hex", "", _("Bits de grupos activos (hex)")),
+        ], _("Mensaje binario configurable. Usa el boton 'Asistente binario' para armarlo."),
         variable=True) for n, rid in ((1, 75), (2, 76), (3, 77))],
-    *[Register(rid, f"NMEA Output {n}", "Sistema", True, [
-        Field("Port", "u8", "", "", {0: "Ninguno", 1: "Puerto 1", 2: "Puerto 2", 3: "Ambos"}),
+    *[Register(rid, f"NMEA Output {n}", _("Sistema"), True, [
+        Field("Port", "u8", "", "", {0: _("Ninguno"), 1: _("Puerto 1"), 2: _("Puerto 2"), 3: _("Ambos")}),
         Field("Rate", "u8", "Hz"), Field("Mode", "u8"), Field("Reserved", "u8"),
-        Field("MessageSelection", "hex", "", "Bitfield de mensajes NMEA (hex)"),
+        Field("MessageSelection", "hex", "", _("Bitfield de mensajes NMEA (hex)")),
     ]) for n, rid in ((1, 101), (2, 102))],
 
     # ---------------- IMU ------------------------------------------------- #
     Register(54, "IMU Measurements", "IMU", False,
              MAG + ACC + GYR + [Field("Temp", "f", "C"), Field("Pressure", "f", "kPa")],
-             "Medidas IMU sin compensar.", "IMU"),
+             _("Medidas IMU sin compensar."), "IMU"),
     Register(80, "Delta Theta / Delta Velocity", "IMU", False,
              [Field("DeltaTime", "f", "s"), *_xyz("DeltaTheta", "deg"), *_xyz("DeltaVelocity", "m/s")],
              async_header="DTV"),
@@ -197,17 +198,17 @@ REGISTERS: List[Register] = [
     Register(25, "Accelerometer Compensation", "IMU", True, _comp("m/s2")),
     Register(84, "Gyro Compensation", "IMU", True, _comp("rad/s")),
     Register(26, "Reference Frame Rotation", "IMU", True, _matrix(),
-             "Matriz de rotacion cuerpo->usuario. Requiere Write Settings + Reset.",
-             caution="Este registro solo se aplica tras guardar en flash y reiniciar."),
+             _("Matriz de rotacion cuerpo->usuario. Requiere Write Settings + Reset."),
+             caution=_("Este registro solo se aplica tras guardar en flash y reiniciar.")),
     Register(85, "IMU Filtering Configuration", "IMU", True, [
         *[Field(f"{s}WindowSize", "u16") for s in ("Mag", "Accel", "Gyro", "Temp", "Pres")],
-        *[Field(f"{s}FilterMode", "u8", "", "", {0: "Sin filtro", 1: "Solo raw", 2: "Solo compensado", 3: "Ambos"})
+        *[Field(f"{s}FilterMode", "u8", "", "", {0: _("Sin filtro"), 1: _("Solo raw"), 2: _("Solo compensado"), 3: _("Ambos")})
           for s in ("Mag", "Accel", "Gyro", "Temp", "Pres")],
     ]),
     Register(82, "Delta Theta/Velocity Config", "IMU", True, [
         Field("IntegrationFrame", "u8", "", "", {0: "Body", 1: "NED", 2: "ECEF"}),
-        Field("GyroCompensation", "u8", "", "", {0: "Ninguna", 1: "Bias"}),
-        Field("AccelCompensation", "u8", "", "", {0: "Ninguna", 1: "Bias"}),
+        Field("GyroCompensation", "u8", "", "", {0: _("Ninguna"), 1: "Bias"}),
+        Field("AccelCompensation", "u8", "", "", {0: _("Ninguna"), 1: "Bias"}),
         Field("Reserved", "u8"), Field("Reserved", "u16"),
     ]),
 
@@ -217,17 +218,17 @@ REGISTERS: List[Register] = [
     Register(103, "GPS2 Solution - LLA", "GPS", False, GPS_SOL, async_header="G2S"),
     Register(104, "GPS2 Solution - ECEF", "GPS", False, GPS_ECEF, async_header="G2E"),
     Register(55, "GPS Configuration", "GPS", True, [
-        Field("Mode", "u8", "", "", {0: "GPS interno", 1: "GPS externo", 2: "Sensor VectorNav externo como GPS"}),
-        Field("PpsSource", "u8", "", "", {0: "GPS_PPS subida", 1: "GPS_PPS bajada", 2: "SyncIn subida", 3: "SyncIn bajada"}),
-        Field("Rate", "u8", "Hz", "Debe ser 5"),
-        Field("TimeSyncDelta", "u8", "", "Reservado (0)"),
-        Field("AntPower", "u8", "", "", {0: "Apagada", 1: "Interna", 2: "Externa (VANT)"}),
+        Field("Mode", "u8", "", "", {0: _("GPS interno"), 1: _("GPS externo"), 2: _("Sensor VectorNav externo como GPS")}),
+        Field("PpsSource", "u8", "", "", {0: _("GPS_PPS subida"), 1: _("GPS_PPS bajada"), 2: _("SyncIn subida"), 3: _("SyncIn bajada")}),
+        Field("Rate", "u8", "Hz", _("Debe ser 5")),
+        Field("TimeSyncDelta", "u8", "", _("Reservado (0)")),
+        Field("AntPower", "u8", "", "", {0: _("Apagada"), 1: _("Interna"), 2: _("Externa (VANT)")}),
     ]),
     Register(57, "GPS Antenna A Offset", "GPS", True, _xyz("Position", "m"),
-             "Brazo de palanca de la antena GPS A respecto al sensor (marco vehiculo)."),
+             _("Brazo de palanca de la antena GPS A respecto al sensor (marco vehiculo).")),
     Register(93, "GPS Compass Baseline", "GPS", True,
              _xyz("Position", "m") + _xyz("Uncertainty", "m"),
-             "Posicion de la antena B respecto a la A. Error rumbo ~ 0.57*err[cm]/L[m]."),
+             _("Posicion de la antena B respecto a la A. Error rumbo ~ 0.57*err[cm]/L[m].")),
     Register(98, "GPS Compass Startup Status", "GPS", False, [
         Field("PercentComplete", "u8", "%"), Field("CurrentHeading", "f", "deg"),
     ]),
@@ -238,20 +239,20 @@ REGISTERS: List[Register] = [
     ]),
 
     # ---------------- Actitud --------------------------------------------- #
-    Register(8, "Yaw Pitch Roll", "Actitud", False, _ypr(), async_header="YPR"),
-    Register(9, "Attitude Quaternion", "Actitud", False,
+    Register(8, "Yaw Pitch Roll", _("Actitud"), False, _ypr(), async_header="YPR"),
+    Register(9, "Attitude Quaternion", _("Actitud"), False,
              [Field(f"Quat[{i}]", "f") for i in range(4)], async_header="QTN"),
-    Register(27, "YPR, Mag, Accel, Gyro", "Actitud", False, _ypr() + MAG + ACC + GYR, async_header="YMR"),
-    Register(15, "Quat, Mag, Accel, Gyro", "Actitud", False,
+    Register(27, "YPR, Mag, Accel, Gyro", _("Actitud"), False, _ypr() + MAG + ACC + GYR, async_header="YMR"),
+    Register(15, "Quat, Mag, Accel, Gyro", _("Actitud"), False,
              [Field(f"Quat[{i}]", "f") for i in range(4)] + MAG + ACC + GYR, async_header="QMR"),
-    Register(17, "Magnetic Measurements", "Actitud", False, MAG, async_header="MAG"),
-    Register(18, "Acceleration Measurements", "Actitud", False, ACC, async_header="ACC"),
-    Register(19, "Angular Rate Measurements", "Actitud", False, GYR, async_header="GYR"),
-    Register(20, "Mag, Accel, Gyro", "Actitud", False, MAG + ACC + GYR, async_header="MAR"),
+    Register(17, "Magnetic Measurements", _("Actitud"), False, MAG, async_header="MAG"),
+    Register(18, "Acceleration Measurements", _("Actitud"), False, ACC, async_header="ACC"),
+    Register(19, "Angular Rate Measurements", _("Actitud"), False, GYR, async_header="GYR"),
+    Register(20, "Mag, Accel, Gyro", _("Actitud"), False, MAG + ACC + GYR, async_header="MAR"),
 
     # ---------------- INS ------------------------------------------------- #
     Register(63, "INS Solution - LLA", "INS", False, [
-        Field("Time", "d", "s"), Field("Week", "u16"), Field("Status", "hex", "", "Bits INS (ver panel En vivo)"),
+        Field("Time", "d", "s"), Field("Week", "u16"), Field("Status", "hex", "", _("Bits INS (ver panel En vivo)")),
         *_ypr(), Field("Latitude", "d", "deg"), Field("Longitude", "d", "deg"), Field("Altitude", "d", "m"),
         *_xyz("NedVel", "m/s"), Field("AttUncertainty", "f", "deg"),
         Field("PosUncertainty", "f", "m"), Field("VelUncertainty", "f", "m/s"),
@@ -271,7 +272,7 @@ REGISTERS: List[Register] = [
         *_xyz("Accel", "m/s2"), *_xyz("AngularRate", "rad/s"),
     ], async_header="ISE"),
     Register(67, "INS Basic Configuration", "INS", True, [
-        Field("Scenario", "u8", "", "", {1: "INS con barometro", 2: "INS sin barometro", 3: "GPS moving baseline (dinamico)"}),
+        Field("Scenario", "u8", "", "", {1: _("INS con barometro"), 2: _("INS sin barometro"), 3: _("GPS moving baseline (dinamico)")}),
         Field("AhrsAiding", "u8", "", "", {0: "Off", 1: "On"}),
         Field("EstBaseline", "u8", "", "", {0: "Off", 1: "On"}),
         Field("Resv2", "u8"),
@@ -283,23 +284,23 @@ REGISTERS: List[Register] = [
     Register(44, "Magnetometer Calibration Control", "Mag HSI", True, [
         Field("HSIMode", "u8", "", "", {0: "HSI_OFF", 1: "HSI_RUN", 2: "HSI_RESET"}),
         Field("HSIOutput", "u8", "", "", {1: "NO_ONBOARD", 3: "USE_ONBOARD"}),
-        Field("ConvergeRate", "u8", "", "1 lento (60-90 s) .. 5 rapido (15-20 s)",
+        Field("ConvergeRate", "u8", "", _("1 lento (60-90 s) .. 5 rapido (15-20 s)"),
               {i: str(i) for i in range(1, 6)}),
-    ], "Calibracion hard/soft iron en tiempo real."),
+    ], _("Calibracion hard/soft iron en tiempo real.")),
     Register(47, "Calculated Magnetometer Cal", "Mag HSI", False, _comp("Gauss"),
-             "Solucion HSI calculada por el algoritmo."),
+             _("Solucion HSI calculada por el algoritmo.")),
     Register(21, "Mag & Gravity Reference", "World", True,
              _xyz("MagRef", "Gauss") + _xyz("AccRef", "m/s2")),
     Register(83, "Reference Vector Configuration", "World", True, [
-        Field("UseMagModel", "u8", "", "", {0: "No", 1: "Si"}),
-        Field("UseGravityModel", "u8", "", "", {0: "No", 1: "Si"}),
+        Field("UseMagModel", "u8", "", "", {0: "No", 1: _("Si")}),
+        Field("UseGravityModel", "u8", "", "", {0: "No", 1: _("Si")}),
         Field("Resv1", "u8"), Field("Resv2", "u8"),
         Field("RecalcThreshold", "u32", "m"), Field("Year", "f", "year"),
         Field("Latitude", "d", "deg"), Field("Longitude", "d", "deg"), Field("Altitude", "d", "m"),
     ]),
 ]
 
-GROUP_ORDER = ["Sistema", "IMU", "GPS", "Actitud", "INS", "Mag HSI", "World"]
+GROUP_ORDER = [_("Sistema"), "IMU", "GPS", _("Actitud"), "INS", "Mag HSI", "World"]
 
 REGISTERS.sort(key=lambda r: (GROUP_ORDER.index(r.group) if r.group in GROUP_ORDER else 99, r.id))
 
@@ -317,11 +318,10 @@ def get(rid: int) -> Register:
     # Registro sin definicion: se permite leerlo y escribirlo en crudo
     if rid not in _UNKNOWN:
         _UNKNOWN[rid] = Register(
-            rid, f"Registro {rid} (sin documentar)", "Otros", True, [],
-            "Registro no documentado. Los valores se muestran tal cual llegan del equipo.",
+            rid, _("Registro {0} (sin documentar)").format(rid), _("Otros"), True, [],
+            _("Registro no documentado. Los valores se muestran tal cual llegan del equipo."),
             variable=True,
-            caution="No documentado: escribe solo si sabes exactamente lo que hace "
-                    "(puede ser un registro interno o de fabrica).")
+            caution=_("No documentado: escribe solo si sabes exactamente lo que hace (puede ser un registro interno o de fabrica)."))
     return _UNKNOWN[rid]
 
 
@@ -344,33 +344,32 @@ def activity(rid: int, vals: Sequence[str]):
 
     if rid == 6:
         a = i(0)
-        return (a != 0, f"$VN{ADOR.get(a, a)}" if a else "sin salida ASCII")
+        return (a != 0, f"$VN{ADOR.get(a, a)}" if a else _("sin salida ASCII"))
     if rid == 7:
         return (i(0) > 0, f"{i(0)} Hz")
     if rid in (75, 76, 77):
         mode, div = i(0), i(1)
         if not mode:
-            return (False, "salida binaria apagada")
-        port = {1: "puerto 1", 2: "puerto 2", 3: "ambos puertos"}.get(mode, str(mode))
-        hz = f"{400 / div:g} Hz" if div else "solo sondeo"
-        return (True, f"{port}, {hz}, grupos {vals[2] if len(vals) > 2 else '?'}")
+            return (False, _("salida binaria apagada"))
+        port = {1: _("puerto 1"), 2: _("puerto 2"), 3: _("ambos puertos")}.get(mode, str(mode))
+        hz = f"{400 / div:g} Hz" if div else _("solo sondeo")
+        return (True, _("{0}, {1}, grupos {2}").format(port, hz, vals[2] if len(vals) > 2 else '?'))
     if rid in (101, 102):
-        return (i(0) != 0, f"puerto {i(0)}, {i(1)} Hz" if i(0) else "NMEA apagado")
+        return (i(0) != 0, _("puerto {0}, {1} Hz").format(i(0), i(1)) if i(0) else _("NMEA apagado"))
     if rid == 44:
-        return (i(0) == 1, {0: "HSI parado", 1: "HSI calibrando", 2: "HSI reset"}.get(i(0), "?"))
+        return (i(0) == 1, {0: _("HSI parado"), 1: _("HSI calibrando"), 2: "HSI reset"}.get(i(0), "?"))
     if rid == 30:
-        on = [n for n, k in (("contador", 0), ("estado", 1)) if i(k)]
-        return (bool(on), "anexa " + " y ".join(on) if on else "sin sufijos")
+        on = [n for n, k in ((_("contador"), 0), (_("estado"), 1)) if i(k)]
+        return (bool(on), _("anexa ") + " y ".join(on) if on else _("sin sufijos"))
     if rid == 55:
-        return (i(4) != 0, {0: "antena GPS sin alimentar", 1: "alim. interna", 2: "alim. externa"}.get(i(4), "?"))
+        return (i(4) != 0, {0: _("antena GPS sin alimentar"), 1: _("alim. interna"), 2: _("alim. externa")}.get(i(4), "?"))
     if rid == 67:
-        return (True, f"escenario {i(0)}, AHRS aiding {'on' if i(1) else 'off'}, "
-                      f"est. baseline {'on' if i(2) else 'off'}")
+        return (True, _("escenario {0}, AHRS aiding {1}, est. baseline {2}").format(i(0), 'on' if i(1) else 'off', 'on' if i(2) else 'off'))
     if rid == 83:
-        on = [n for n, k in (("modelo magnetico", 0), ("modelo gravedad", 1)) if i(k)]
-        return (bool(on), ", ".join(on) if on else "modelos apagados")
+        on = [n for n, k in ((_("modelo magnetico"), 0), (_("modelo gravedad"), 1)) if i(k)]
+        return (bool(on), ", ".join(on) if on else _("modelos apagados"))
     if rid == 32:
-        return (i(4) != 0, f"SyncIn modo {i(0)}, SyncOut modo {i(4)}")
+        return (i(4) != 0, _("SyncIn modo {0}, SyncOut modo {1}").format(i(0), i(4)))
     return None
 
 
@@ -396,9 +395,9 @@ def validate_values(reg: Register, values: Sequence[str]) -> List[str]:
         vals.pop()
     required = [f for f in reg.fields if not f.optional]
     if len(vals) < len(required):
-        raise ValueError(f"Se esperaban al menos {len(required)} valores, hay {len(vals)}")
+        raise ValueError(_("Se esperaban al menos {0} valores, hay {1}").format(len(required), len(vals)))
     if not reg.variable and reg.fields and len(vals) > len(reg.fields):
-        raise ValueError(f"Demasiados valores ({len(vals)} > {len(reg.fields)})")
+        raise ValueError(_("Demasiados valores ({0} > {1})").format(len(vals), len(reg.fields)))
     for i, v in enumerate(vals):
         if i < len(reg.fields):
             out.append(reg.fields[i].validate(v))
@@ -412,7 +411,7 @@ def validate_values(reg: Register, values: Sequence[str]) -> List[str]:
 #  INS status (registro 63, campo Status; tambien binario InsStatus)
 # --------------------------------------------------------------------------- #
 
-INS_MODE = {0: "No tracking (init compass)", 1: "Alineando", 2: "Tracking OK", 3: "Perdida GPS >45 s"}
+INS_MODE = {0: "No tracking (init compass)", 1: _("Alineando"), 2: "Tracking OK", 3: _("Perdida GPS >45 s")}
 
 
 def decode_ins_status(st: int) -> Dict[str, object]:

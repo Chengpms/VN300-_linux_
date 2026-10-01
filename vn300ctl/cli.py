@@ -16,13 +16,18 @@ Linea de comandos.
   vn300ctl regs                             lista el catalogo de registros
   vn300ctl sgb | sfb -p ... [--flash]       $VNSGB / $VNSFB: bias estimado -> registro 74
 
+  --lang es|en (o VN300_LANG) elige el idioma; por defecto, el del sistema.
+
 Catalogo y comandos segun el manual UM005 para firmware v0.5.0.0 (rev. 2.22).
 """
 
 from __future__ import annotations
 
+from .i18n import LANG, _
+
 import argparse
 import json
+import os
 import sys
 import time
 from typing import Dict, List
@@ -33,7 +38,7 @@ from .device import VN300, VNError, VNTimeout, list_ports
 
 def _connect(args) -> VN300:
     if not args.port:
-        sys.exit("Falta -p/--port (p.ej. -p /dev/ttyUSB0, o -p sim para el simulador)")
+        sys.exit(_("Falta -p/--port (p.ej. -p /dev/ttyUSB0, o -p sim para el simulador)"))
     dev = VN300()
     try:
         if args.baud:
@@ -41,10 +46,10 @@ def _connect(args) -> VN300:
             dev.read_register(1, timeout=0.6)
         else:
             b = dev.autodetect(args.port)
-            print(f"# baudrate detectado: {b}", file=sys.stderr)
+            print(_("# baudrate detectado: {0}").format(b), file=sys.stderr)
     except Exception as exc:
         dev.close()
-        sys.exit(f"No se pudo conectar a {args.port}: {exc}")
+        sys.exit(_("No se pudo conectar a {0}: {1}").format(args.port, exc))
     return dev
 
 
@@ -79,11 +84,60 @@ def _split_groups(tokens: List[str]) -> Dict[int, List[str]]:
     return items
 
 
+EPILOG_EN = """
+Command line.
+
+  vn300ctl                                  opens the interface (TUI)
+  vn300ctl tui   -p /dev/ttyUSB0 -b 115200  same, connecting straight away
+  vn300ctl ports                            lists serial ports
+  vn300ctl info  -p /dev/ttyUSB0            model, S/N, firmware
+  vn300ctl read  -p ... 8 63 98             reads one or more registers
+  vn300ctl write -p ... 7 40 [--flash]      writes a register
+  vn300ctl write -p ... 6 14 -- 7 40 --flash   several registers at once
+  vn300ctl flash -p ... config.json         writes a JSON (TUI export) and saves to flash
+  vn300ctl dump  -p ... [-o config.json]    exports every configurable register
+  vn300ctl monitor -p ...                   prints live attitude/INS (plain text)
+  vn300ctl log -p ... -o data.csv [-t 60]   records CSV without the interface (Ctrl+C to stop)
+  vn300ctl cmd   -p ... "RRG,8"             raw ASCII command
+  vn300ctl regs                             lists the register catalog
+  vn300ctl sgb | sfb -p ... [--flash]       $VNSGB / $VNSFB: estimated bias -> register 74
+
+  --lang es|en (or VN300_LANG) chooses the language; by default, the system's.
+
+Catalog and commands per the UM005 manual for firmware v0.5.0.0 (rev. 2.22).
+"""
+
+
+def _restart_tui(port, baud, lang: str) -> None:
+    """Vuelve a lanzar la interfaz en el nuevo idioma (los catalogos se traducen al importar)."""
+    argv = []
+    skip = False
+    for a in sys.argv[1:]:
+        if skip:
+            skip = False
+            continue
+        if a == "--lang":
+            skip = True
+            continue
+        if a.startswith("--lang=") or a in ("-p", "--port", "-b", "--baud"):
+            skip = a in ("-p", "--port", "-b", "--baud")
+            continue
+        argv.append(a)
+    if port:
+        argv = ["-p", port] + argv
+    if baud:
+        argv = ["-b", str(baud)] + argv
+    os.environ["VN300_LANG"] = lang
+    os.execv(sys.executable, [sys.executable, "-m", "vn300ctl", *argv])
+
+
 def main(argv=None) -> None:
-    ap = argparse.ArgumentParser(prog="vn300ctl", description="Control del VectorNav VN-300 desde Linux",
-                                 formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
-    ap.add_argument("-p", "--port", help="/dev/ttyUSB0, /dev/serial/by-id/..., o 'sim'")
-    ap.add_argument("-b", "--baud", type=int, help="baudrate (por defecto se autodetecta)")
+    ap = argparse.ArgumentParser(prog="vn300ctl", description=_("Control del VectorNav VN-300 desde Linux"),
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 epilog=__doc__ if LANG == "es" else EPILOG_EN)
+    ap.add_argument("-p", "--port", help=_("/dev/ttyUSB0, /dev/serial/by-id/..., o 'sim'"))
+    ap.add_argument("-b", "--baud", type=int, help=_("baudrate (por defecto se autodetecta)"))
+    ap.add_argument("--lang", choices=["es", "en"], help=_("idioma de la interfaz (por defecto: el del sistema)"))
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("tui")
     sub.add_parser("ports")
@@ -92,32 +146,34 @@ def main(argv=None) -> None:
     p = sub.add_parser("read")
     p.add_argument("ids", nargs="+", type=int)
     p = sub.add_parser("write")
-    p.add_argument("--flash", action="store_true", help="guardar en flash ($VNWNV) al final")
-    p.add_argument("--yes", "-y", action="store_true", help="no pedir confirmacion")
-    p.add_argument("spec", nargs=argparse.REMAINDER, help="ID valores... [-- ID valores...]")
+    p.add_argument("--flash", action="store_true", help=_("guardar en flash ($VNWNV) al final"))
+    p.add_argument("--yes", "-y", action="store_true", help=_("no pedir confirmacion"))
+    p.add_argument("spec", nargs=argparse.REMAINDER, help=_("ID valores... [-- ID valores...]"))
     p = sub.add_parser("flash")
     p.add_argument("file")
-    p.add_argument("--no-save", action="store_true", help="no ejecutar $VNWNV")
+    p.add_argument("--no-save", action="store_true", help=_("no ejecutar $VNWNV"))
     p.add_argument("--yes", "-y", action="store_true")
     p = sub.add_parser("dump")
     p.add_argument("-o", "--output")
     sub.add_parser("monitor")
     p = sub.add_parser("log")
     p.add_argument("-o", "--output", required=True)
-    p.add_argument("-t", "--seconds", type=float, default=0, help="duracion (0 = hasta Ctrl+C)")
+    p.add_argument("-t", "--seconds", type=float, default=0, help=_("duracion (0 = hasta Ctrl+C)"))
     p = sub.add_parser("cmd")
     p.add_argument("text")
     for name in ("save", "reset", "factory"):
         sub.add_parser(name)
     for name in ("sgb", "sfb"):
         p = sub.add_parser(name)
-        p.add_argument("--flash", action="store_true", help="guardar en flash ($VNWNV) despues")
+        p.add_argument("--flash", action="store_true", help=_("guardar en flash ($VNWNV) despues"))
 
     args = ap.parse_args(argv)
 
     if args.cmd in (None, "tui"):
         from .tui import VN300App
-        VN300App(args.port, args.baud).run()
+        res = VN300App(args.port, args.baud).run()
+        if isinstance(res, dict) and res.get("lang"):
+            _restart_tui(res.get("port"), res.get("baud"), res["lang"])
         return
 
     if args.cmd == "ports":
@@ -139,7 +195,7 @@ def main(argv=None) -> None:
                 print(f"{k:<8} {v}")
             print(f"{'baud':<8} {dev.baud}")
             if not dev.firmware_matches(info.get("fw", "")):
-                print(f"AVISO: el equipo tiene firmware v{info.get('fw')}; el catalogo es el de v{R.FIRMWARE}")
+                print(_("AVISO: el equipo tiene firmware v{0}; el catalogo es el de v{1}").format(info.get('fw'), R.FIRMWARE))
 
         elif args.cmd == "read":
             for rid in args.ids:
@@ -154,13 +210,16 @@ def main(argv=None) -> None:
             yes = args.yes or "-y" in args.spec or "--yes" in args.spec
             items = _split_groups(spec)
             if not items:
-                sys.exit("Nada que escribir. Ej: write 7 40   o   write 6 14 -- 7 40 --flash")
+                sys.exit(_("Nada que escribir. Ej: write 7 40   o   write 6 14 -- 7 40 --flash"))
             for rid, vals in items.items():
-                items[rid] = R.validate_values(R.get(rid), vals)
+                try:
+                    items[rid] = R.validate_values(R.get(rid), vals)
+                except ValueError as exc:
+                    sys.exit(_("Reg {0}: {1}").format(rid, exc))
                 print(f"  $VNWRG,{rid},{','.join(items[rid])}")
             if flash:
                 print("  $VNWNV")
-            if not yes and input("¿Enviar? [s/N] ").strip().lower() not in ("s", "si", "y", "yes"):
+            if not yes and input(_("¿Enviar? [s/N] ")).strip().lower() not in ("s", "si", "y", "yes"):
                 return
             res = dev.flash_many(items, save=flash)
             for rid, r in res.items():
@@ -180,14 +239,14 @@ def main(argv=None) -> None:
                 print(f"  $VNWRG,{rid},{','.join(vals)}")
             if not args.no_save:
                 print("  $VNWNV")
-            if not args.yes and input(f"¿Flashear {len(items)} registros? [s/N] ").strip().lower() not in ("s", "si", "y"):
+            if not args.yes and input(_("¿Flashear {0} registros? [s/N] ").format(len(items))).strip().lower() not in ("s", "si", "y"):
                 return
             res = dev.flash_many(items, save=not args.no_save,
                                  progress=lambda k, n, m: print(f"  [{k}/{n}] {m}"))
             bad = [rid for rid, r in res.items() if isinstance(r, Exception)]
             for rid in bad:
                 print(f"[{rid}] ERROR {res[rid]}")
-            print(f"Listo: {len(res) - len(bad)} OK, {len(bad)} con error")
+            print(_("Listo: {0} OK, {1} con error").format(len(res) - len(bad), len(bad)))
 
         elif args.cmd == "dump":
             ids = [r.id for r in R.REGISTERS if r.writable and r.id != 33]
@@ -200,7 +259,7 @@ def main(argv=None) -> None:
             if args.output:
                 with open(args.output, "w") as fh:
                     fh.write(txt)
-                print(f"Guardado {args.output} ({len(data['registros'])} registros)")
+                print(_("Guardado {0} ({1} registros)").format(args.output, len(data['registros'])))
             else:
                 print(txt)
 
@@ -209,7 +268,7 @@ def main(argv=None) -> None:
             st = LiveState()
             dev.on_ascii = st.ingest_ascii
             dev.on_binary = st.ingest_binary
-            print("Ctrl+C para salir")
+            print(_("Ctrl+C para salir"))
             while True:
                 if st.age("ypr") > 0.5:
                     try:
@@ -237,7 +296,7 @@ def main(argv=None) -> None:
             dev.on_binary = st.ingest_binary
             st.start_csv(args.output)
             t0 = time.monotonic()
-            print(f"Grabando en {args.output} (Ctrl+C para parar)")
+            print(_("Grabando en {0} (Ctrl+C para parar)").format(args.output))
             try:
                 while not args.seconds or time.monotonic() - t0 < args.seconds:
                     # Sin salida asincrona: consultar actitud/IMU e INS
@@ -251,11 +310,11 @@ def main(argv=None) -> None:
                             st.ingest_register(63, dev.read_register(63, timeout=0.3, retries=0), "RRG")
                         except (VNTimeout, VNError):
                             pass
-                    print(f"\r  {st.csv_rows} filas  {time.monotonic() - t0:6.1f} s", end="", flush=True)
+                    print(_("\r  {0} filas  {1:6.1f} s").format(st.csv_rows, time.monotonic() - t0), end="", flush=True)
                     time.sleep(0.05)
             finally:
                 st.stop_csv()
-                print(f"\nGuardado {args.output} ({st.csv_rows} filas)")
+                print(_("\nGuardado {0} ({1} filas)").format(args.output, st.csv_rows))
 
         elif args.cmd == "cmd":
             got = []
@@ -270,18 +329,18 @@ def main(argv=None) -> None:
             if args.flash:
                 dev.write_settings()
             _print_reg(74, dev.read_register(74))
-            print("OK" + (" (guardado en flash)" if args.flash else " (en RAM; usa 'save' para guardarlo)"))
+            print("OK" + (_(" (guardado en flash)") if args.flash else _(" (en RAM; usa 'save' para guardarlo)")))
 
         elif args.cmd == "save":
             dev.write_settings()
-            print("OK: configuracion guardada en flash")
+            print(_("OK: configuracion guardada en flash"))
         elif args.cmd == "reset":
             dev.reset()
-            print("OK: equipo reiniciado")
+            print(_("OK: equipo reiniciado"))
         elif args.cmd == "factory":
-            if input("Restaurar configuracion de fabrica? [s/N] ").strip().lower() in ("s", "si", "y"):
+            if input(_("Restaurar configuracion de fabrica? [s/N] ")).strip().lower() in ("s", "si", "y"):
                 dev.restore_factory()
-                print("OK: configuracion de fabrica restaurada")
+                print(_("OK: configuracion de fabrica restaurada"))
     except KeyboardInterrupt:
         print()
     finally:

@@ -5,6 +5,8 @@ decodificacion de los mensajes asincronos (ASCII y binarios).
 
 from __future__ import annotations
 
+from .i18n import _
+
 import queue
 import threading
 import time
@@ -26,7 +28,7 @@ RESPONSE_HEADERS = {"VNRRG", "VNWRG", "VNWNV", "VNRFS", "VNRST", "VNASY",
 class VNError(Exception):
     def __init__(self, code: int, cmd: str = ""):
         self.code = code
-        txt = ERROR_CODES.get(code, "desconocido")
+        txt = ERROR_CODES.get(code, _("desconocido"))
         super().__init__(f"VNERR {code}: {txt}" + (f"  [{cmd}]" if cmd else ""))
 
 
@@ -154,7 +156,7 @@ class VN300:
             except (VNTimeout, VNError):
                 continue
         self.close()
-        raise VNTimeout(f"El equipo no responde en {port} con ningun baudrate")
+        raise VNTimeout(_("El equipo no responde en {0} con ningun baudrate").format(port))
 
     # ------------------------------------------------------------------ #
     #  Lectura
@@ -253,7 +255,7 @@ class VN300:
     def send_raw(self, body: str) -> None:
         """Envia un comando sin esperar respuesta (consola)."""
         if self.ser is None:
-            raise VNTimeout("No conectado")
+            raise VNTimeout(_("No conectado"))
         body = body.strip().lstrip("$")
         if "*" in body:
             body = body.split("*", 1)[0]
@@ -267,7 +269,7 @@ class VN300:
     def command(self, body: str, expect: str, match_id: Optional[int] = None,
                 timeout: float = 1.0, retries: int = 2, quiet: bool = False) -> AsciiMsg:
         if self.ser is None:
-            raise VNTimeout("No conectado")
+            raise VNTimeout(_("No conectado"))
         with self._cmd_lock:
             self._quiet = quiet
             try:
@@ -278,8 +280,8 @@ class VN300:
     def _command(self, body: str, expect: str, match_id: Optional[int],
                  timeout: float, retries: int) -> AsciiMsg:
         frame = build_ascii(body, self.use_crc)
-        last: Exception = VNTimeout(f"Sin respuesta a {body}")
-        for _ in range(retries + 1):
+        last: Exception = VNTimeout(_("Sin respuesta a {0}").format(body))
+        for _attempt in range(retries + 1):
             while not self._resp.empty():
                 try:
                     self._resp.get_nowait()
@@ -290,7 +292,7 @@ class VN300:
             try:
                 self.ser.write(frame)
             except Exception as exc:
-                raise VNTimeout(f"Error escribiendo: {exc}")
+                raise VNTimeout(_("Error escribiendo: {0}").format(exc))
             deadline = time.monotonic() + timeout
             while True:
                 left = deadline - time.monotonic()
@@ -430,15 +432,15 @@ class VN300:
         for k, rid in enumerate(order):
             vals = R.validate_values(R.get(rid), items[rid])
             if progress:
-                progress(k, total, f"Escribiendo reg {rid}")
+                progress(k, total, _("Escribiendo reg {0}").format(rid))
             try:
                 out[rid] = self.write_register(rid, vals)
             except (VNTimeout, VNError) as exc:
                 out[rid] = exc
         if save:
             if progress:
-                progress(total - 1, total, "Guardando en flash (WNV)")
+                progress(total - 1, total, _("Guardando en flash (WNV)"))
             self.write_settings()
         if progress:
-            progress(total, total, "Listo")
+            progress(total, total, _("Listo"))
         return out

@@ -10,6 +10,8 @@ Protocolo serie del VN-300, firmware v0.5.0.0 (manual UM005 rev. 2.22, secciones
 
 from __future__ import annotations
 
+from .i18n import _
+
 import struct
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -40,13 +42,13 @@ def crc16(data: bytes, crc: int = 0) -> int:
 ERROR_CODES = {
     1: "Hard Fault",
     2: "Serial Buffer Overflow",
-    3: "Checksum invalido",
-    4: "Comando invalido",
-    5: "Faltan parametros",
-    6: "Demasiados parametros",
-    7: "Parametro invalido",
-    8: "Registro invalido",
-    9: "Acceso no autorizado (registro de solo lectura)",
+    3: _("Checksum invalido"),
+    4: _("Comando invalido"),
+    5: _("Faltan parametros"),
+    6: _("Demasiados parametros"),
+    7: _("Parametro invalido"),
+    8: _("Registro invalido"),
+    9: _("Acceso no autorizado (registro de solo lectura)"),
     10: "Watchdog Reset",
     11: "Output Buffer Overflow",
     12: "Insufficient Baud Rate",
