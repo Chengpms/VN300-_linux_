@@ -22,6 +22,27 @@ ese manual aparecen como "sin documentar" (lectura y escritura en crudo).
 La primera vez, `./vn300` crea `.venv/` e instala `textual` y `pyserial`.
 Si no tienes permiso sobre el puerto: `sudo usermod -aG dialout $USER` y vuelve a iniciar sesión.
 
+## Capturas
+
+Hechas con el simulador integrado (`./vn300 -p sim`), sin hardware conectado.
+
+**F2 En vivo**: actitud, IMU, INS, GPS A/B y vista 3D
+
+![F2 En vivo](docs/img/live.png)
+
+**F2 En vivo**: gráficas (Pitch/Roll, Gyro, Accel, Mag, Velocidad, Yaw)
+
+![F2 gráficas](docs/img/charts.png)
+
+| | |
+|---|---|
+| ![F1 Conexión](docs/img/conn.png) **F1 Conexión** | ![F3 Registros](docs/img/regs.png) **F3 Registros** |
+| ![F4 Consola](docs/img/console.png) **F4 Consola** | ![F5 Herramientas](docs/img/tools.png) **F5 Herramientas** |
+
+**F6 Vista 3D**
+
+![F6 Vista 3D](docs/img/3d.png)
+
 ## Interfaz (teclas F1–F6)
 
 | Pestaña | Qué hace |

@@ -24,6 +24,27 @@ The interface, the command line and `vn300.sh` work in **English and Spanish** (
 The first time, `./vn300` creates `.venv/` and installs `textual` and `pyserial`.
 If you don't have permission on the port: `sudo usermod -aG dialout $USER`, then log out and back in.
 
+## Screenshots
+
+Taken with the built-in simulator (`./vn300 -p sim`), no hardware connected.
+
+**F2 Live**: attitude, IMU, INS, GPS A/B and the 3D view
+
+![F2 Live](docs/img/live.png)
+
+**F2 Live**: charts (Pitch/Roll, Gyro, Accel, Mag, Velocity, Yaw)
+
+![F2 charts](docs/img/charts.png)
+
+| | |
+|---|---|
+| ![F1 Connection](docs/img/conn.png) **F1 Connection** | ![F3 Registers](docs/img/regs.png) **F3 Registers** |
+| ![F4 Console](docs/img/console.png) **F4 Console** | ![F5 Tools](docs/img/tools.png) **F5 Tools** |
+
+**F6 3D view**
+
+![F6 3D view](docs/img/3d.png)
+
 ## Interface (keys F1–F6)
 
 | Tab | What it does |
