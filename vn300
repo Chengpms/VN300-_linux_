@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Lanzador: usa el entorno virtual del proyecto (lo crea la primera vez).
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+if [ ! -x "$DIR/.venv/bin/python" ]; then
+    echo "Creando entorno virtual en $DIR/.venv ..."
+    python3 -m venv "$DIR/.venv" && "$DIR/.venv/bin/pip" install -q -r "$DIR/requirements.txt" || exit 1
+fi
+cd "$DIR" && exec "$DIR/.venv/bin/python" -m vn300ctl "$@"
