@@ -34,9 +34,9 @@ Hechas con el simulador integrado (`./vn300 -p sim`), sin hardware conectado.
 
 ![F2 gráficas](docs/img/charts.png)
 
-| | |
-|---|---|
-| ![F1 Conexión](docs/img/conn.png) **F1 Conexión** | ![F3 Registros](docs/img/regs.png) **F3 Registros** |
+|                                                    |                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------- |
+| ![F1 Conexión](docs/img/conn.png) **F1 Conexión**  | ![F3 Registros](docs/img/regs.png) **F3 Registros**        |
 | ![F4 Consola](docs/img/console.png) **F4 Consola** | ![F5 Herramientas](docs/img/tools.png) **F5 Herramientas** |
 
 **F6 Vista 3D**
@@ -45,14 +45,14 @@ Hechas con el simulador integrado (`./vn300 -p sim`), sin hardware conectado.
 
 ## Interfaz (teclas F1–F6)
 
-| Pestaña | Qué hace |
-|---|---|
-| **F1 Conexión** | Puerto, baudrate (auto), info del equipo, salida ASCII asíncrona (reg 6/7), pausar/reanudar, guardar en flash, reset y restaurar fábrica. Selector de **idioma** |
-| **F2 En vivo** | Actitud (horizonte, cinta de rumbo y **vista 3D**), IMU, estado INS, GPS A/B, compás GPS. Gráficas braille de alta resolución (Pitch/Roll, Yaw, Gyro, Accel, Mag, Velocidad) con ventana de 2–60 s y congelar (Ctrl+F). Lee el flujo ASCII o binario que ya emita el equipo (si solo manda cuaternión, calcula YPR) y consulta lo que falte. **Grabar CSV** (Ctrl+R) en `~/vn300_logs/` |
-| **F3 Registros** | Escaneo de los 256 IDs al conectar: columna **Estado** (● ACTIVO / ○ inactivo / ✓ responde / ✕ no existe) con detalle (p.ej. salida binaria a 100 Hz, velocity aiding activo). Filtro: documentados + detectados, solo los que responden, solo activos, todos. Formulario por campo, **Leer**, **Escribir** (RAM), **Escribir + flash**, **+ Lote** para flashear varios, exportar/importar JSON (`~/vn300_configs/`). Los registros sin documentar se pueden leer y escribir en crudo |
-| **F4 Consola** | Terminal ASCII: escribe `RRG,8` o `WRG,7,40`; `$VN` y el checksum se añaden solos. Los errores `VNERR` se traducen |
-| **F5 Herramientas** | Calibración hard/soft iron (reg 44/47 → 23), bias de arranque con `$VNSGB`/`$VNSFB` (→ reg 74), matriz de montaje a partir de yaw/pitch/roll (reg 26) y asistente de salida binaria (reg 75–77) con casillas |
-| **F6 Vista 3D** | El VN-300 en 3D a pantalla completa, girando con yaw/pitch/roll en tiempo real: caja con su cara frontal (+X) en naranja, flecha de avance, ejes X/Y/Z del cuerpo y suelo NED con el Norte marcado. Arrastra con el ratón para girar la cámara, rueda para el zoom, doble clic para reiniciar (o flechas, `+`/`-` y `r`) |
+| Pestaña             | Qué hace                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1 Conexión**     | Puerto, baudrate (auto), info del equipo, salida ASCII asíncrona (reg 6/7), pausar/reanudar, guardar en flash, reset y restaurar fábrica. Selector de **idioma**                                                                                                                                                                                                                                                                                                                       |
+| **F2 En vivo**      | Actitud (horizonte, cinta de rumbo y **vista 3D**), IMU, estado INS, GPS A/B, compás GPS. Gráficas braille de alta resolución (Pitch/Roll, Yaw, Gyro, Accel, Mag, Velocidad) con ventana de 2–60 s y congelar (Ctrl+F). Lee el flujo ASCII o binario que ya emita el equipo (si solo manda cuaternión, calcula YPR) y consulta lo que falte. **Grabar CSV** (Ctrl+R) en `~/vn300_logs/`                                                                                                |
+| **F3 Registros**    | Escaneo de los 256 IDs al conectar: columna **Estado** (● ACTIVO / ○ inactivo / ✓ responde / ✕ no existe) con detalle (p.ej. salida binaria a 100 Hz, velocity aiding activo). Filtro: documentados + detectados, solo los que responden, solo activos, todos. Formulario por campo, **Leer**, **Escribir** (RAM), **Escribir + flash**, **+ Lote** para flashear varios, exportar/importar JSON (`~/vn300_configs/`). Los registros sin documentar se pueden leer y escribir en crudo |
+| **F4 Consola**      | Terminal ASCII: escribe `RRG,8` o `WRG,7,40`; `$VN` y el checksum se añaden solos. Los errores `VNERR` se traducen                                                                                                                                                                                                                                                                                                                                                                     |
+| **F5 Herramientas** | Calibración hard/soft iron (reg 44/47 → 23), bias de arranque con `$VNSGB`/`$VNSFB` (→ reg 74), matriz de montaje a partir de yaw/pitch/roll (reg 26) y asistente de salida binaria (reg 75–77) con casillas                                                                                                                                                                                                                                                                           |
+| **F6 Vista 3D**     | El VN-300 en 3D a pantalla completa, girando con yaw/pitch/roll en tiempo real: caja con su cara frontal (+X) en naranja, flecha de avance, ejes X/Y/Z del cuerpo y suelo NED con el Norte marcado. Arrastra con el ratón para girar la cámara, rueda para el zoom, doble clic para reiniciar (o flechas, `+`/`-` y `r`)                                                                                                                                                               |
 
 `Ctrl+S` guarda en flash (`$VNWNV`); `Ctrl+Q` sale.
 
@@ -63,8 +63,8 @@ por orden de prioridad: `--lang es|en`, la variable `VN300_LANG`, el selector de
 `~/.config/vn300ctl/settings.json`) y, si no hay nada, el idioma del sistema. Cambiarlo en F1 reinicia
 la interfaz y vuelve a conectar al mismo puerto.
 
-**Escribir y flashear no es lo mismo:** *Escribir* cambia el registro en RAM, y el cambio se pierde
-al reiniciar. *Flash* ejecuta además `$VNWNV`, que guarda **todos** los registros en memoria no volátil.
+**Escribir y flashear no es lo mismo:** _Escribir_ cambia el registro en RAM, y el cambio se pierde
+al reiniciar. _Flash_ ejecuta además `$VNWNV`, que guarda **todos** los registros en memoria no volátil.
 El equipo debe estar quieto mientras guarda.
 
 ## Script con modos: `vn300.sh`
@@ -83,7 +83,7 @@ Puerto por defecto: `VN300_PORT` o el FTDI en `/dev/serial/by-id`.
 
 No están en el manual de firmware v0.5.0.0, así que la app no los define: si el equipo los
 responde, salen en F3 como "sin documentar" y se pueden leer o escribir en crudo. En los manuales
-VN-100 son *Velocity Compensation Measurement* (50) y *Control* (51), y solo compensan la aceleración
+VN-100 son _Velocity Compensation Measurement_ (50) y _Control_ (51), y solo compensan la aceleración
 centrípeta del filtro de actitud. No son una entrada de odometría para el INS.
 
 ## Línea de comandos (para scripts)
@@ -111,6 +111,10 @@ centrípeta del filtro de actitud. No son una entrada de odometría para el INS.
   En un lote, el reg 5 se escribe al final para no cortar la secuencia.
 - Si el equipo usa CRC16 (reg 30, `SerialChecksum=3`), se detecta en la primera respuesta y se usa CRC.
 - No incluye la actualización de firmware (`$VNFWU`, protocolo AN013).
+
+## Copyright
+
+Copyright © 2026 Cheng Marquet. Todos los derechos reservados.
 
 ## Estructura
 

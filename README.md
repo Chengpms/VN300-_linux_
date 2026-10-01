@@ -36,10 +36,10 @@ Taken with the built-in simulator (`./vn300 -p sim`), no hardware connected.
 
 ![F2 charts](docs/img/charts.png)
 
-| | |
-|---|---|
+|                                                       |                                                     |
+| ----------------------------------------------------- | --------------------------------------------------- |
 | ![F1 Connection](docs/img/conn.png) **F1 Connection** | ![F3 Registers](docs/img/regs.png) **F3 Registers** |
-| ![F4 Console](docs/img/console.png) **F4 Console** | ![F5 Tools](docs/img/tools.png) **F5 Tools** |
+| ![F4 Console](docs/img/console.png) **F4 Console**    | ![F5 Tools](docs/img/tools.png) **F5 Tools**        |
 
 **F6 3D view**
 
@@ -47,19 +47,19 @@ Taken with the built-in simulator (`./vn300 -p sim`), no hardware connected.
 
 ## Interface (keys F1–F6)
 
-| Tab | What it does |
-|---|---|
-| **F1 Connection** | Port, baudrate (auto), device info, ASCII async output (reg 6/7), pause/resume, save to flash, reset and factory reset. **Language** selector |
-| **F2 Live** | Attitude (horizon, heading tape and **3D view**), IMU, INS status, GPS A/B, GPS compass. High-resolution braille charts (Pitch/Roll, Yaw, Gyro, Accel, Mag, Velocity) with a 2–60 s window and freeze (Ctrl+F). Reads the ASCII or binary stream the device already outputs (if it only sends a quaternion, YPR is computed) and polls whatever is missing. **Record CSV** (Ctrl+R) to `~/vn300_logs/` |
-| **F3 Registers** | Scans all 256 IDs on connect: **Status** column (● ACTIVE / ○ inactive / ✓ responds / ✕ missing) with detail (e.g. binary output at 100 Hz, velocity aiding active). Filter: documented + detected, responding only, active only, all. Per-field form, **Read**, **Write** (RAM), **Write + flash**, **+ Batch** to flash several, JSON export/import (`~/vn300_configs/`). Undocumented registers can be read and written raw |
-| **F4 Console** | ASCII terminal: type `RRG,8` or `WRG,7,40`; `$VN` and the checksum are added for you. `VNERR` errors are explained |
-| **F5 Tools** | Hard/soft iron calibration (reg 44/47 → 23), startup bias with `$VNSGB`/`$VNSFB` (→ reg 74), mounting matrix from yaw/pitch/roll (reg 26) and a binary output wizard (reg 75–77) with checkboxes |
-| **F6 3D view** | Full-screen 3D VN-300 turning with yaw/pitch/roll in real time: the box with its front face (+X) in orange, a forward arrow, the body X/Y/Z axes and an NED floor with North marked. Drag with the mouse to orbit the camera, wheel to zoom, double-click to reset (or arrow keys, `+`/`-` and `r`) |
+| Tab               | What it does                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **F1 Connection** | Port, baudrate (auto), device info, ASCII async output (reg 6/7), pause/resume, save to flash, reset and factory reset. **Language** selector                                                                                                                                                                                                                                                                                  |
+| **F2 Live**       | Attitude (horizon, heading tape and **3D view**), IMU, INS status, GPS A/B, GPS compass. High-resolution braille charts (Pitch/Roll, Yaw, Gyro, Accel, Mag, Velocity) with a 2–60 s window and freeze (Ctrl+F). Reads the ASCII or binary stream the device already outputs (if it only sends a quaternion, YPR is computed) and polls whatever is missing. **Record CSV** (Ctrl+R) to `~/vn300_logs/`                         |
+| **F3 Registers**  | Scans all 256 IDs on connect: **Status** column (● ACTIVE / ○ inactive / ✓ responds / ✕ missing) with detail (e.g. binary output at 100 Hz, velocity aiding active). Filter: documented + detected, responding only, active only, all. Per-field form, **Read**, **Write** (RAM), **Write + flash**, **+ Batch** to flash several, JSON export/import (`~/vn300_configs/`). Undocumented registers can be read and written raw |
+| **F4 Console**    | ASCII terminal: type `RRG,8` or `WRG,7,40`; `$VN` and the checksum are added for you. `VNERR` errors are explained                                                                                                                                                                                                                                                                                                             |
+| **F5 Tools**      | Hard/soft iron calibration (reg 44/47 → 23), startup bias with `$VNSGB`/`$VNSFB` (→ reg 74), mounting matrix from yaw/pitch/roll (reg 26) and a binary output wizard (reg 75–77) with checkboxes                                                                                                                                                                                                                               |
+| **F6 3D view**    | Full-screen 3D VN-300 turning with yaw/pitch/roll in real time: the box with its front face (+X) in orange, a forward arrow, the body X/Y/Z axes and an NED floor with North marked. Drag with the mouse to orbit the camera, wheel to zoom, double-click to reset (or arrow keys, `+`/`-` and `r`)                                                                                                                            |
 
 `Ctrl+S` saves to flash (`$VNWNV`); `Ctrl+Q` quits.
 
-**Writing and flashing are not the same:** *Write* changes the register in RAM, and the change is lost
-on restart. *Flash* also runs `$VNWNV`, which saves **all** registers to non-volatile memory.
+**Writing and flashing are not the same:** _Write_ changes the register in RAM, and the change is lost
+on restart. _Flash_ also runs `$VNWNV`, which saves **all** registers to non-volatile memory.
 Keep the device still while it saves.
 
 ## Language
@@ -86,7 +86,7 @@ Default port: `VN300_PORT` or the FTDI in `/dev/serial/by-id`.
 
 They are not in the firmware v0.5.0.0 manual, so the app does not define them: if the device answers
 them, they show up in F3 as "undocumented" and can be read or written raw. In the VN-100 manuals they are
-*Velocity Compensation Measurement* (50) and *Control* (51), and they only compensate the centripetal
+_Velocity Compensation Measurement_ (50) and _Control_ (51), and they only compensate the centripetal
 acceleration of the attitude filter. They are not an odometry input for the INS.
 
 ## Command line (for scripts)
@@ -117,6 +117,10 @@ acceleration of the attitude filter. They are not an odometry input for the INS.
 - Firmware update (`$VNFWU`, AN013 protocol) is not included.
 - Configuration JSON files keep their Spanish keys (`registros`, `valores`, ...) in both languages, so
   exports from either language can be imported by the other.
+
+## Copyright
+
+Copyright © 2026 Cheng Marquet. All rights reserved.
 
 ## Layout
 
